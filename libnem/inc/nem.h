@@ -9,3 +9,4 @@
 #include "nem-error.h"
 #include "nem-thunk.h"
 #include "nem-panic.h"
+#include "nem-msg.h"

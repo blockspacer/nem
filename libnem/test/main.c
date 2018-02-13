@@ -3,10 +3,12 @@
 typedef Suite*(*suite_def)();
 
 extern Suite 
-	*suite_thunk();
+	*suite_thunk(),
+	*suite_msg();
 
 static suite_def suites[] = {
 	&suite_thunk,
+	&suite_msg,
 };
 
 int
