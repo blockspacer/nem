@@ -1,6 +1,5 @@
-/bin
-/obj
-/doc/acronym.md
+bin
+obj
 *.swp
 *.core
 /vgcore.*
