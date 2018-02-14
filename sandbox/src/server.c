@@ -29,6 +29,10 @@ typedef struct {
 	NEM_thunk_t      *on_kevent;
 	NEM_thunk_t      *on_msg;
 	NEM_thunk1_t     *on_close;
+
+	NEM_msg_t *msg;
+	size_t off;
+	size_t cap;
 }
 NEM_child_t;
 
@@ -40,21 +44,59 @@ NEM_child_on_kevent(NEM_thunk_t *thunk, void *varg)
 
 	if (EVFILT_READ == ev->filter) {
 		fprintf(stdout, "[parent] child read ready (%lu)\n", ev->data);
-		if (0 < ev->data) {
-			char *data = NEM_malloc(((size_t) ev->data) + 1);
-			if (0 > read(ev->ident, data, ev->data)) {
+
+		if (NULL == this->msg) {
+			if (sizeof(NEM_pmsg_t) <= ev->data) {
+				NEM_pmsg_t pmsg;
+				if (0 > read(ev->ident, &pmsg, sizeof(pmsg))) {
+					NEM_panic("read");
+				}
+
+				this->msg = NEM_msg_alloc(pmsg.header_len, pmsg.body_len);
+				this->off = 0;
+				this->cap = pmsg.header_len + pmsg.body_len;
+				ev->data -= sizeof(NEM_pmsg_t);
+			}
+		}
+		// NB: not else if.
+		if (NULL != this->msg) {
+			if (ev->data > this->cap) {
+				ev->data = this->cap;
+			}
+			if (0 > read(ev->ident, &this->msg->appended[this->off], ev->data)) {
 				NEM_panic("read");
 			}
-			fprintf(stdout, "[child] %s\n", data);
-			free(data);
+			this->off += ev->data;
+			if (this->off == this->cap) {
+				fprintf(stdout, "[child] %s\n", this->msg->body);
+				NEM_msg_free(this->msg);
+				this->msg = NULL;
+			}
 		}
 	}
 	else if (EVFILT_WRITE == ev->filter) {
-		fprintf(stdout, "[parent] child write ready\n");
-		dprintf(this->fds_stdin[0], "hello");
+		static bool HACK = true;
+		fprintf(stdout, "[parent] child write ready (%lu)\n", ev->data);
+		// XXX: This needs to check EOF in flags (fflags?).
+
+		if (HACK) {
+			HACK = false;
+
+			NEM_msg_t *msg = NEM_msg_alloc(0, 6);
+			memcpy(msg->body, "hello", 6);
+			ssize_t r = write(
+				this->fds_stdin[0],
+				&msg->packed,
+				sizeof(msg->packed) + 6
+			);
+			if (r != sizeof(msg->packed) + 6) {
+				NEM_panic("short write");
+			}
+			NEM_msg_free(msg);
+		}
 	}
 	else if (EVFILT_PROC == ev->filter) {
-		fprintf(stdout, "[parent] proc exit\n");
+		fprintf(stdout, "[parent] proc exit (%d)\n", (int)ev->data);
 		this->state = CHILD_STOPPED;
 
 		if (NULL != this->on_close) {
@@ -83,7 +125,7 @@ NEM_child_init(NEM_child_t *this, int kq)
 	this->kq = kq;
 
 	struct kevent evs[2];
-	EV_SET(&evs[0], this->fds_stdin[0], EVFILT_WRITE, EV_ADD, 0, 0, cb);
+	EV_SET(&evs[0], this->fds_stdin[0], EVFILT_WRITE, EV_ADD|EV_CLEAR, 0, 0, cb);
 	EV_SET(&evs[1], this->fds_stdout[0], EVFILT_READ, EV_ADD, 0, 0, cb);
 	if (-1 == kevent(kq, evs, NEM_ARRSIZE(evs), NULL, 0, NULL)) {
 		close(this->fds_stdin[0]);
@@ -158,6 +200,9 @@ NEM_child_free(NEM_child_t *this)
 		}
 	}
 
+	if (NULL != this->msg) {
+		NEM_msg_free(this->msg);
+	}
 	if (NULL != this->on_msg) {
 		NEM_thunk_free(this->on_msg);
 	}
@@ -213,7 +258,6 @@ main(int argc, char *argv[])
 
 	while (running) {
 		struct kevent trig;
-		fprintf(stdout, "[parent] waiting\n");
 		if (-1 == kevent(kq, NULL, 0, &trig, 1, NULL)) {
 			NEM_panic("kevent");
 		}

@@ -12,7 +12,8 @@ typedef struct {
 	uint16_t header_len; // Length of header, in bytes.
 	uint64_t seq;        // Sequence number of request/reply.
 	uint32_t body_len;   // Length of body in bytes.
-	uint32_t padding;
+	uint16_t service_id; // Id of service being requested.
+	uint16_t command_id; // Id of service command being requested.
 }
 NEM_pmsg_t;
 #pragma pack(pop)
@@ -29,7 +30,8 @@ static const uint8_t
 	NEM_PMSGFLAG_REPLY    = 1 << 0, // This message is a reply to request seq.
 	NEM_PMSGFLAG_CONTINUE = 1 << 1, // Additional messages continue the body.
 	NEM_PMSGFLAG_CANCEL   = 1 << 2, // Cancel future replies to this seq.
-	NEM_PMSGFLAG_FD       = 1 << 3; // File descriptor follows fixed header.
+	NEM_PMSGFLAG_FD       = 1 << 3, // File descriptor follows fixed header.
+	NEM_PMSGFLAG_ROUTE    = 1 << 4; // Message should be forwarded.
 
 // NEM_msg_t is the unpacked version of NEM_pmsg_t. It can be allocated such
 // that the headers/body are immediately preceded by the packed contents. The
@@ -42,8 +44,12 @@ typedef struct {
 	int   flags;  // NEM_MSGFLAG_*s OR'd.
 
 	// NB: packed+appended can be sent as a single blob.
-	NEM_pmsg_t packed;
-	char       appended[];
+	#pragma pack(push, 0)
+	struct {
+		NEM_pmsg_t packed;
+		char       appended[];
+	};
+	#pragma pack(pop)
 }
 NEM_msg_t;
 
