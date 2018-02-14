@@ -84,7 +84,7 @@ NEM_child_init(NEM_child_t *this, int kq)
 
 	struct kevent evs[2];
 	EV_SET(&evs[0], this->fds_stdin[0], EVFILT_WRITE, EV_ADD, 0, 0, cb);
-	EV_SET(&evs[0], this->fds_stdout[0], EVFILT_READ, EV_ADD, 0, 0, cb);
+	EV_SET(&evs[1], this->fds_stdout[0], EVFILT_READ, EV_ADD, 0, 0, cb);
 	if (-1 == kevent(kq, evs, NEM_ARRSIZE(evs), NULL, 0, NULL)) {
 		close(this->fds_stdin[0]);
 		close(this->fds_stdin[1]);
@@ -119,9 +119,8 @@ NEM_child_run(NEM_child_t *this, const char *path)
 		char *args[] = { NULL };
 		char *env[] = { NULL };
 
-		if (-1 == execve(path, args, env)) {
-			NEM_panic("NEM_child_run: execve");
-		}
+		execve(path, args, env);
+		NEM_panic("NEM_child_run: execve");
 	}
 
 	struct kevent evs[1];
@@ -197,14 +196,14 @@ main(int argc, char *argv[])
 	NEM_child_t child;
 	err = NEM_child_init(&child, kq);
 	if (!NEM_err_ok(err)) {
-		NEM_panic(NEM_err_string(err));
+		NEM_panicf("NEM_child_init: %s", NEM_err_string(err));
 	}
 
 	close(STDIN_FILENO);
 
 	err = NEM_child_run(&child, "./client");
 	if (!NEM_err_ok(err)) {
-		NEM_panic(NEM_err_string(err));
+		NEM_panicf("NEM_child_run: %s", NEM_err_string(err));
 	}
 
 	child.on_close = NEM_thunk1_new_ptr(
