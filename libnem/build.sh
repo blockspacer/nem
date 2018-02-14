@@ -1,5 +1,7 @@
 #!/bin/sh -e
 
+cd `dirname $0`
+
 CC=clang37
 SOURCE_FILES=src/*.c
 OBJ_FILES=
