@@ -53,6 +53,14 @@ typedef struct {
 }
 NEM_msg_t;
 
+// NEM_msglist_t is a helper for a singly-linked list of messages. This should
+// probably be implemented with SLIST macros but I am lazy or something.
+typedef struct NEM_msglist_t {
+	NEM_msg_t *msg;
+	struct NEM_msglist_t *next;
+}
+NEM_msglist_t;
+
 static const uint8_t
 	NEM_MSGFLAG_HEADER_INLINE = 1 << 0, // header is inlined.
 	NEM_MSGFLAG_BODY_INLINE  = 1 << 1, // body is inlined.

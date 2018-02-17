@@ -10,3 +10,5 @@
 #include "nem-thunk.h"
 #include "nem-panic.h"
 #include "nem-msg.h"
+#include "nem-chan.h"
+#include "nem-pipechan.h"

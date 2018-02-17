@@ -4,11 +4,13 @@ typedef Suite*(*suite_def)();
 
 extern Suite 
 	*suite_thunk(),
-	*suite_msg();
+	*suite_msg(),
+	*suite_pipechan();
 
 static suite_def suites[] = {
 	&suite_thunk,
 	&suite_msg,
+	&suite_pipechan,
 };
 
 int
@@ -60,4 +62,10 @@ Suite*
 tcase_build_suite(const char *name, tcase_t *tests, size_t blen)
 {
 	return tcase_build_suite_with_fixtures(name, NULL, NULL, tests, blen);
+}
+
+void
+ck_err(NEM_err_t err)
+{
+	ck_assert_msg(NEM_err_ok(err), NEM_err_string(err));
 }
