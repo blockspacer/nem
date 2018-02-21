@@ -29,4 +29,3 @@ NEM_err_t NEM_pipechan_init(
 void NEM_pipechan_free(NEM_pipechan_t *this);
 void NEM_pipechan_on_msg(NEM_pipechan_t *this, NEM_thunk_t *cb);
 void NEM_pipechan_send_msg(NEM_pipechan_t *this, NEM_msg_t *msg);
-

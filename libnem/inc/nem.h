@@ -12,3 +12,4 @@
 #include "nem-msg.h"
 #include "nem-chan.h"
 #include "nem-pipechan.h"
+#include "nem-unixchan.h"

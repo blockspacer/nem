@@ -5,12 +5,14 @@ typedef Suite*(*suite_def)();
 extern Suite 
 	*suite_thunk(),
 	*suite_msg(),
-	*suite_pipechan();
+	*suite_pipechan(),
+	*suite_unixchan();
 
 static suite_def suites[] = {
 	&suite_thunk,
 	&suite_msg,
 	&suite_pipechan,
+	&suite_unixchan,
 };
 
 int
