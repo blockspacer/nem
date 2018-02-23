@@ -7,7 +7,12 @@
 static void
 NEM_pipechan_on_read(NEM_pipechan_t *this, size_t avail)
 {
-	if (NULL != this->on_msg) {
+	if (NULL == this->on_msg) {
+		this->ravail = avail;
+		return;
+	}
+
+	do {
 		if (NULL == this->rmsg && avail >= sizeof(NEM_pmsg_t)) {
 			NEM_pmsg_t tmpmsg;
 			if (0 > read(this->fd_in, &tmpmsg, sizeof(tmpmsg))) {
@@ -44,11 +49,7 @@ NEM_pipechan_on_read(NEM_pipechan_t *this, size_t avail)
 			avail -= to_read;
 		}
 	}
-
-	this->ravail = avail;
-	if (this->ravail > 0) {
-		return NEM_pipechan_on_read(this, avail);
-	}
+	while (this->ravail >= sizeof(NEM_pmsg_t));
 }
 
 static void
