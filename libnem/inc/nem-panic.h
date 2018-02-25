@@ -1,6 +1,4 @@
 #pragma once
-#include <sys/types.h>
-#include <stdlib.h>
 
 // NEM_panic unwinds the stack with the specified message.
 _Noreturn void NEM_panic(const char *msg);

@@ -1,5 +1,24 @@
 #include "nem.h"
 
+NEM_err_t
+NEM_pmsg_validate(const NEM_pmsg_t *this)
+{
+	if (NEM_PMSG_MAGIC != this->magic) {
+		return NEM_err_static("NEM_pmsg_validate: invalid magic");
+	}
+	if (NEM_PMSG_VERSION != this->version) {
+		return NEM_err_static("NEM_pmsg_validate: invalid version");
+	}
+	if (NEM_PMSG_HDRMAX < this->header_len) {
+		return NEM_err_static("NEM_pmsg_validate: header length exceeds max");
+	}
+	if (NEM_PMSG_BODYMAX < this->body_len) {
+		return NEM_err_static("NEM_pmsg_validate: body length exceeds max");
+	}
+
+	return NEM_err_none;
+}
+
 NEM_msg_t*
 NEM_msg_alloc(size_t header_len, size_t body_len)
 {

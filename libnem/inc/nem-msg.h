@@ -33,6 +33,10 @@ static const uint8_t
 	NEM_PMSGFLAG_FD       = 1 << 3, // File descriptor follows fixed header.
 	NEM_PMSGFLAG_ROUTE    = 1 << 4; // Message should be forwarded.
 
+// NEM_pmsg_validate returns an error if the packed message doesn't look
+// valid (e.g. if any of the fields are set in an invalid manner). 
+NEM_err_t NEM_pmsg_validate(const NEM_pmsg_t *this);
+
 // NEM_msg_t is the unpacked version of NEM_pmsg_t. It can be allocated such
 // that the headers/body are immediately preceded by the packed contents. The
 // intent is to abstract that packing so they can be easily unpacked and
