@@ -22,12 +22,23 @@ NEM_fd_t;
 
 extern const NEM_stream_vt NEM_fd_stream_vt;
 
+// NEM_fd_init and NEM_fd_init2 initialize a new NEM_fd_t from an already-
+// opened file descriptor. The passed-in file descriptor is consumed by this;
+// it is either immediately closed or closed when NEM_fd_close/free is called.
 NEM_err_t NEM_fd_init(NEM_fd_t *this, int kq, int fd);
 NEM_err_t NEM_fd_init2(NEM_fd_t *this, int kq, int fd_in, int fd_out);
-void NEM_fd_free(NEM_fd_t *this);
 
+// NEM_fd_init_pipe initializes a pair of NEM_fd_t's linked together with
+// an everyday pipe.
 NEM_err_t NEM_fd_init_pipe(NEM_fd_t *this, NEM_fd_t *that, int kq);
+
+// NEM_fd_init_unix initializes a pair of NEM_fd_t's linked together with an
+// anonymous unix domain socket.
 NEM_err_t NEM_fd_init_unix(NEM_fd_t *this, NEM_fd_t *that, int kq);
+
+// NEM_fd_free frees the passed-in fd. It closes it if it's not already
+// been closed.
+void NEM_fd_free(NEM_fd_t *this);
 
 NEM_stream_t NEM_fd_as_stream(NEM_fd_t *this);
 

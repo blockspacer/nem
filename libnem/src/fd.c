@@ -70,6 +70,13 @@ NEM_fd_shutdown(NEM_fd_t *this)
 	if (NULL != this->on_close) {
 		NEM_thunk1_invoke(&this->on_close, &ca);
 	}
+
+	if (close(this->fd_in)) {
+		NEM_panicf_errno("NEM_fd_free: close(fd_in): %s");
+	}
+	if (this->fd_in != this->fd_out && close(this->fd_out)) {
+		NEM_panicf_errno("NEM_fd_free: close(fd_out): %s");
+	}
 }
 
 static void
@@ -180,6 +187,8 @@ NEM_fd_init2(NEM_fd_t *this, int kq, int fd_in, int fd_out)
 	EV_SET(&evs[0], fd_in, EVFILT_READ, EV_ADD|EV_CLEAR, 0, 0, on_ev);
 	EV_SET(&evs[1], fd_out, EVFILT_WRITE, EV_ADD|EV_CLEAR, 0, 0, on_ev);
 	if (-1 == kevent(kq, evs, NEM_ARRSIZE(evs), NULL, 0, NULL)) {
+		close(fd_in);
+		close(fd_out);
 		NEM_thunk_free(on_ev);
 		return NEM_err_errno();
 	}
@@ -348,6 +357,16 @@ NEM_fd_init_unix(NEM_fd_t *this, NEM_fd_t *that, int kq)
 	}
 }
 
+void
+NEM_fd_free(NEM_fd_t *this)
+{
+	NEM_fd_shutdown(this);
+
+	// NB: fds should be removed from the kqueue now, so we can safely
+	// kill the kevent thunk.
+	NEM_thunk_free(this->on_kevent);
+}
+
 NEM_stream_t
 NEM_fd_as_stream(NEM_fd_t *this)
 {
@@ -357,23 +376,6 @@ NEM_fd_as_stream(NEM_fd_t *this)
 	};
 
 	return stream;
-}
-
-void
-NEM_fd_free(NEM_fd_t *this)
-{
-	NEM_fd_shutdown(this);
-
-	if (close(this->fd_in)) {
-		NEM_panicf_errno("NEM_fd_free: close(fd_in): %s");
-	}
-	if (this->fd_in != this->fd_out && close(this->fd_out)) {
-		NEM_panicf_errno("NEM_fd_free: close(fd_out): %s");
-	}
-
-	// NB: fds should be removed from the kqueue now, so we can safely
-	// kill the kevent thunk.
-	NEM_thunk_free(this->on_kevent);
 }
 
 NEM_err_t
