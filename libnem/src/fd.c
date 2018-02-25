@@ -45,6 +45,14 @@ NEM_fd_stream_on_close(void *vthis, NEM_thunk1_t *cb)
 }
 
 static void
+NEM_close_fd_checked(int fd)
+{
+	if (-1 != fcntl(fd, F_GETFD)) {
+		close(fd);
+	}
+}
+
+static void
 NEM_fd_shutdown(NEM_fd_t *this)
 {
 	bool was_running = this->running;
@@ -187,8 +195,8 @@ NEM_fd_init2(NEM_fd_t *this, int kq, int fd_in, int fd_out)
 	EV_SET(&evs[0], fd_in, EVFILT_READ, EV_ADD|EV_CLEAR, 0, 0, on_ev);
 	EV_SET(&evs[1], fd_out, EVFILT_WRITE, EV_ADD|EV_CLEAR, 0, 0, on_ev);
 	if (-1 == kevent(kq, evs, NEM_ARRSIZE(evs), NULL, 0, NULL)) {
-		close(fd_in);
-		close(fd_out);
+		NEM_close_fd_checked(fd_in);
+		NEM_close_fd_checked(fd_out);
 		NEM_thunk_free(on_ev);
 		return NEM_err_errno();
 	}
