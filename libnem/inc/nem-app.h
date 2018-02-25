@@ -13,10 +13,6 @@ typedef struct {
 	int  kq;
 	bool running;
 
-	NEM_thunk1_t **defers;
-	size_t         defers_len;
-	size_t         defers_cap;
-
 	NEM_thunk_t     *on_timer;
 	NEM_timer_tree_t timers;
 }
