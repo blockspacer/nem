@@ -203,6 +203,10 @@ NEM_app_free(NEM_app_t *this)
 	}
 
 	NEM_thunk_free(this->on_timer);
+	if (0 != close(this->kq)) {
+		NEM_panicf_errno("NEM_app_free: close(kq): %s");
+	}
+
 	this->kq = 0;
 }
 
@@ -240,8 +244,9 @@ NEM_app_defer(NEM_app_t *this, NEM_thunk1_t *cb)
 		}
 
 		// XXX: use reallocarray.
-		realloc(&this->defers, this->defers_cap * sizeof(NEM_thunk1_t));
-		NEM_panic_if_null(this->defers);
+		this->defers = NEM_panic_if_null(
+			realloc(this->defers, this->defers_cap * sizeof(NEM_thunk1_t))
+		);
 	}
 
 	this->defers[this->defers_len] = cb;
