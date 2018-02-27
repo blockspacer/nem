@@ -390,9 +390,11 @@ NEM_err_t
 NEM_fd_read(NEM_fd_t *this, void *buf, size_t len, NEM_thunk1_t *cb)
 {
 	if (!this->running) {
+		NEM_thunk1_discard(&cb);
 		return NEM_err_static("NEM_fd_read: already closed");
 	}
 	if (NULL != this->on_read) {
+		NEM_thunk1_discard(&cb);
 		return NEM_err_static("NEM_fd_read: interleaved reads");
 	}
 
@@ -408,9 +410,11 @@ NEM_err_t
 NEM_fd_write(NEM_fd_t *this, void *buf, size_t len, NEM_thunk1_t *cb)
 {
 	if (!this->running) {
+		NEM_thunk1_discard(&cb);
 		return NEM_err_static("NEM_fd_write: already closed");
 	}
 	if (NULL != this->on_write) {
+		NEM_thunk1_discard(&cb);
 		return NEM_err_static("NEM_fd_write: interleaved writes");
 	}
 

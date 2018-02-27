@@ -125,6 +125,45 @@ START_TEST(defer_chain)
 }
 END_TEST
 
+static void
+defer_timer_timer_cb(NEM_thunk1_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk1_ptr(thunk);
+	ck_assert_int_eq(1, work->ctr);
+	work->ctr += 1;
+	NEM_app_stop(&work->app);
+}
+
+static void
+defer_timer_defer_cb(NEM_thunk1_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk1_ptr(thunk);
+	ck_assert_int_eq(0, work->ctr);
+	work->ctr += 1;
+}
+
+START_TEST(defer_timer)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_app_after(&work.app, 10, NEM_thunk1_new_ptr(
+		&defer_timer_timer_cb,
+		&work
+	));
+
+	NEM_app_defer(&work.app, NEM_thunk1_new_ptr(
+		&defer_timer_defer_cb,
+		&work
+	));
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(work.ctr, 2);
+
+	work_free(&work);
+}
+END_TEST
+
 Suite*
 suite_app()
 {
@@ -134,6 +173,7 @@ suite_app()
 		{ "stop_run_free",  &stop_run_free  },
 		{ "defer_parallel", &defer_parallel },
 		{ "defer_chain",    &defer_chain    },
+		{ "defer_timer",    &defer_timer    },
 	};
 
 	return tcase_build_suite("app", tests, sizeof(tests));

@@ -26,12 +26,18 @@ NEM_stream_ca;
 // Inline dispatch
 //
 
+// NEM_stream_read reads from the specified stream into the provided buffer.
+// Reads cannot be interleaved -- if there's already a read scheduled this
+// will return an error. The passed thunk is always freed, but if an error
+// is returned it is not called.
 static inline NEM_err_t
 NEM_stream_read(NEM_stream_t this, void *buf, size_t len, NEM_thunk1_t *cb)
 {
 	return this.vt->read(this.this, buf, len, cb);
 }
 
+// NEM_stream_write has the same semantics as NEM_stream_read, except it
+// writes to the stream. Reads and writes may be interleaved separately.
 static inline NEM_err_t
 NEM_stream_write(NEM_stream_t this, void *buf, size_t len, NEM_thunk1_t *cb)
 {
