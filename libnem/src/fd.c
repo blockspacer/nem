@@ -218,12 +218,12 @@ NEM_fd_init_pipe(NEM_fd_t *this, NEM_fd_t *that, int kq)
 
 	NEM_err_t err;
 
-	err = NEM_fd_init(this, fds[0], kq);
+	err = NEM_fd_init(this, kq, fds[0]);
 	if (!NEM_err_ok(err)) {
 		return err;
 	}
 
-	err = NEM_fd_init(that, fds[1], kq);
+	err = NEM_fd_init(that, kq, fds[1]);
 	if (!NEM_err_ok(err)) {
 		NEM_fd_free(this);
 		return err;
@@ -334,14 +334,14 @@ NEM_fd_init_unix(NEM_fd_t *this, NEM_fd_t *that, int kq)
 
 	// Then hook up the NEM_fd_t's to fd_cli and fd_srv.
 	NEM_err_t err;
-	err = NEM_fd_init(this, fd_srv, kq);
+	err = NEM_fd_init(this, kq, fd_srv);
 	if (!NEM_err_ok(err)) {
 		close(fd_srv);
 		close(fd_cli);
 		return err;
 	}
 
-	err = NEM_fd_init(that, fd_cli, kq);
+	err = NEM_fd_init(that, kq, fd_cli);
 	if (!NEM_err_ok(err)) {
 		close(fd_cli);
 		NEM_fd_free(this);

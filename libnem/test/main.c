@@ -6,13 +6,15 @@ extern Suite
 	*suite_thunk(),
 	*suite_msg(),
 	*suite_app(),
-	*suite_fd();
+	*suite_fd(),
+	*suite_stream();
 
 static suite_def suites[] = {
 	&suite_thunk,
 	&suite_msg,
 	&suite_app,
 	&suite_fd,
+	&suite_stream,
 };
 
 int

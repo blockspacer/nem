@@ -190,7 +190,7 @@ START_TEST(read_1)
 	NEM_app_init_root(&work.app);
 
 	NEM_fd_t fd;
-	NEM_fd_init(&fd, work.app.kq, work.fds[0]);
+	ck_err(NEM_fd_init(&fd, work.app.kq, work.fds[0]));
 	work.fds_freed[0] = true;
 
 	ck_assert_int_eq(6, write(work.fds[1], "hello", 6));
@@ -233,7 +233,7 @@ START_TEST(err_read_interleaved)
 	NEM_app_init_root(&work.app);
 
 	NEM_fd_t fd;
-	NEM_fd_init(&fd, work.app.kq, work.fds[0]);
+	ck_err(NEM_fd_init(&fd, work.app.kq, work.fds[0]));
 	work.fds_freed[0] = true;
 
 	work.buf = alloca(12);
@@ -259,6 +259,63 @@ START_TEST(err_read_interleaved)
 }
 END_TEST
 
+START_TEST(err_read_closed)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_app_init_root(&work.app);
+
+	NEM_fd_t fd;
+	ck_err(NEM_fd_init(&fd, work.app.kq, work.fds[0]));
+	work.fds_freed[0] = true;
+	work.buf = alloca(6);
+
+	NEM_fd_close(&fd);
+	NEM_err_t err = NEM_fd_read(&fd, work.buf, 6, NEM_thunk1_new_ptr(
+		&err_fail_cb,
+		NULL
+	));
+	ck_assert(!NEM_err_ok(err));
+
+	NEM_fd_free(&fd);
+	NEM_app_free(&work.app);
+	work_free(&work);
+}
+END_TEST
+
+static void
+err_read_then_close_cb(NEM_thunk1_t *thunk, void *varg)
+{
+	NEM_stream_ca *ca = varg;
+	ck_assert(!NEM_err_ok(ca->err));
+	bool *called = NEM_thunk1_ptr(thunk);
+	*called = true;
+}
+
+START_TEST(err_read_then_close)
+{
+	work_t work;
+	work_init(&work);
+	NEM_app_init_root(&work.app);
+
+	NEM_fd_t fd;
+	ck_err(NEM_fd_init(&fd, work.app.kq, work.fds[0]));
+	work.fds_freed[0] = true;
+	work.buf = alloca(6);
+
+	bool called = false;
+	ck_err(NEM_fd_read(&fd, work.buf, 6, NEM_thunk1_new_ptr(
+		&err_read_then_close_cb,
+		&called
+	)));
+
+	NEM_fd_free(&fd);
+	NEM_app_free(&work.app);
+	work_free(&work);
+}
+END_TEST
+
 Suite*
 suite_fd()
 {
@@ -274,6 +331,8 @@ suite_fd()
 		{ "err_init2_invalid_fd2", &err_init2_invalid_fd2 },
 		{ "read_1",                &read_1                },
 		{ "err_read_interleaved",  &err_read_interleaved  },
+		{ "err_read_closed",       &err_read_closed       },
+		{ "err_read_then_close",   &err_read_then_close   },
 	};
 
 	return tcase_build_suite("fd", tests, sizeof(tests));
