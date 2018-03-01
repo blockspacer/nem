@@ -7,7 +7,8 @@ extern Suite
 	*suite_msg(),
 	*suite_app(),
 	*suite_fd(),
-	*suite_stream();
+	*suite_stream(),
+	*suite_chan();
 
 static suite_def suites[] = {
 	&suite_thunk,
@@ -15,6 +16,7 @@ static suite_def suites[] = {
 	&suite_app,
 	&suite_fd,
 	&suite_stream,
+	&suite_chan,
 };
 
 int
