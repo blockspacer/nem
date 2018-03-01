@@ -8,6 +8,7 @@ typedef struct {
 	NEM_fd_t  fd_2;
 	bool      fds_freed[2];
 	char     *bufs[2];
+	int       state[2];
 }
 work_t;
 
@@ -109,6 +110,78 @@ write_once(fd_init_fn fn)
 START_TEST(pipe_write_once) { write_once(&NEM_fd_init_pipe); } END_TEST
 START_TEST(unix_write_once) { write_once(&NEM_fd_init_unix); } END_TEST
 
+static void
+echo_rcb(NEM_thunk1_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk1_ptr(thunk);
+	NEM_stream_ca *ca = varg;
+	ck_err(ca->err);
+
+	if (0 == work->state[0]) {
+		work->state[0] = 1;
+		ck_assert_str_eq("hello", work->bufs[0]);
+		ck_err(
+			NEM_stream_write(work->s_1, work->bufs[0], 6, NEM_thunk1_new_ptr(
+				&echo_rcb,
+				work
+			))
+		);
+	}
+}
+
+static void
+echo_wcb(NEM_thunk1_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk1_ptr(thunk);
+	NEM_stream_ca *ca = varg;
+	ck_err(ca->err);
+
+	if (0 == work->state[1]) {
+		work->state[1] = 1;
+		ck_err(
+			NEM_stream_read(work->s_2, work->bufs[1], 6, NEM_thunk1_new_ptr(
+				&echo_wcb,
+				work
+			))
+		);
+	}
+	else {
+		work->state[1] = 2;
+		ck_assert_str_eq("hello", work->bufs[1]);
+		NEM_app_stop(&work->app);
+	}
+}
+
+static void
+echo(fd_init_fn fn)
+{
+	work_t work;
+	work_init(&work, fn);
+	work.bufs[0] = alloca(6);
+	work.bufs[1] = alloca(6);
+
+	ck_err(NEM_stream_read(work.s_1, work.bufs[0], 6, NEM_thunk1_new_ptr(
+		&echo_rcb,
+		&work
+	)));
+
+	ck_err(NEM_stream_write(work.s_2, "hello", 6, NEM_thunk1_new_ptr(
+		&echo_wcb,
+		&work
+	)));
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_str_eq("hello", work.bufs[0]);
+	ck_assert_str_eq("hello", work.bufs[1]);
+	ck_assert_int_eq(1, work.state[0]);
+	ck_assert_int_eq(2, work.state[1]);
+
+	work_free(&work);
+}
+
+START_TEST(pipe_echo) { echo(&NEM_fd_init_pipe); } END_TEST
+START_TEST(unix_echo) { echo(&NEM_fd_init_unix); } END_TEST
+
 Suite*
 suite_stream()
 {
@@ -117,6 +190,8 @@ suite_stream()
 		{ "unix_init_free",  &unix_init_free  },
 		{ "pipe_write_once", &pipe_write_once },
 		{ "unix_write_once", &unix_write_once },
+		{ "pipe_echo",       &pipe_echo       },
+		{ "unix_echo",       &unix_echo       },
 	};
 
 	return tcase_build_suite("stream", tests, sizeof(tests));
