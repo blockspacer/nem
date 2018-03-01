@@ -75,14 +75,20 @@ NEM_fd_shutdown(NEM_fd_t *this)
 		NEM_thunk1_invoke(&this->on_read, &ca);
 	}
 
+	// NB: Once we call this->on_close, we need to assume this is no
+	// longer valid memory. So copy all the stuff we care about into
+	// a separate bit.
+	int fd_in = this->fd_in;
+	int fd_out = this->fd_out;
+
 	if (NULL != this->on_close) {
 		NEM_thunk1_invoke(&this->on_close, &ca);
 	}
 
-	if (close(this->fd_in)) {
+	if (close(fd_in)) {
 		NEM_panicf_errno("NEM_fd_free: close(fd_in): %s");
 	}
-	if (this->fd_in != this->fd_out && close(this->fd_out)) {
+	if (fd_in != fd_out && close(fd_out)) {
 		NEM_panicf_errno("NEM_fd_free: close(fd_out): %s");
 	}
 }
@@ -368,11 +374,10 @@ NEM_fd_init_unix(NEM_fd_t *this, NEM_fd_t *that, int kq)
 void
 NEM_fd_free(NEM_fd_t *this)
 {
-	NEM_fd_shutdown(this);
-
-	// NB: fds should be removed from the kqueue now, so we can safely
-	// kill the kevent thunk.
 	NEM_thunk_free(this->on_kevent);
+
+	// NB: NEM_fd_shutdown potentially frees 'this', do this last.
+	NEM_fd_shutdown(this);
 }
 
 NEM_stream_t

@@ -19,7 +19,7 @@ work_stop_cb(NEM_thunk1_t *thunk, void *varg)
 {
 	work_t *work = NEM_thunk1_ptr(thunk);
 	NEM_app_stop(&work->app);
-	ck_assert_msg(false, "timed out");
+	ck_assert_msg(false, "too long");
 }
 
 static void
@@ -252,6 +252,59 @@ err_write_preclosed(fd_init_fn fn)
 }
 DEFINE_TESTS(err_write_preclosed);
 
+static void
+dangerous_reuse_cb(NEM_thunk1_t *thunk, void *varg)
+{
+	int *ctr = NEM_thunk1_ptr(thunk);
+	*ctr += 1;
+}
+
+static void
+dangerous_reuse_onclose(NEM_thunk1_t *thunk, void *varg)
+{
+	NEM_fd_t *fd = NEM_thunk1_ptr(thunk);
+	NEM_fd_free(fd);
+	free(fd);
+}
+
+static void
+dangerous_reuse(fd_init_fn fn)
+{
+	char buf[6];
+	NEM_fd_t *fd1 = NEM_malloc(sizeof(NEM_fd_t));
+	NEM_fd_t *fd2 = NEM_malloc(sizeof(NEM_fd_t));
+
+	int kq = kqueue();
+	ck_assert_int_ne(-1, kq);
+
+	ck_err(NEM_fd_init_pipe(fd1, fd2, kq));
+	NEM_fd_on_close(fd1, NEM_thunk1_new_ptr(
+		&dangerous_reuse_onclose,
+		fd1
+	));
+	NEM_fd_on_close(fd2, NEM_thunk1_new_ptr(
+		&dangerous_reuse_onclose,
+		fd2
+	));
+
+	NEM_fd_close(fd2);
+
+	int ctr = 0;
+	ck_err(NEM_fd_read(fd1, buf, 6, NEM_thunk1_new_ptr(
+		&dangerous_reuse_cb,
+		&ctr
+	)));
+	ck_err(NEM_fd_write(fd1, buf, 6, NEM_thunk1_new_ptr(
+		&dangerous_reuse_cb,
+		&ctr
+	)));
+
+	NEM_fd_close(fd1);
+
+	close(kq);
+}
+DEFINE_TESTS(dangerous_reuse);
+
 Suite*
 suite_stream()
 {
@@ -262,6 +315,7 @@ suite_stream()
 		USE_TESTS(err_read_closed),
 		USE_TESTS(err_read_preclosed),
 		USE_TESTS(err_write_preclosed),
+		USE_TESTS(dangerous_reuse),
 	};
 
 	return tcase_build_suite("stream", tests, sizeof(tests));
