@@ -50,6 +50,14 @@ work_free(work_t *work)
 	NEM_app_free(&work->app);
 }
 
+#define DEFINE_TESTS(fn) \
+	START_TEST(fn##_pipe) { fn(&NEM_fd_init_pipe); } END_TEST \
+	START_TEST(fn##_unix) { fn(&NEM_fd_init_unix); } END_TEST
+
+#define USE_TESTS(fn) \
+	{ #fn"_pipe", &fn##_pipe }, \
+	{ #fn"_unix", &fn##_unix }
+
 static void
 init_free(fd_init_fn fn)
 {
@@ -57,9 +65,7 @@ init_free(fd_init_fn fn)
 	work_init(&work, fn);
 	work_free(&work);
 }
-
-START_TEST(pipe_init_free) { init_free(&NEM_fd_init_pipe); } END_TEST
-START_TEST(unix_init_free) { init_free(&NEM_fd_init_unix); } END_TEST
+DEFINE_TESTS(init_free);
 
 static void
 write_once_rcb(NEM_thunk1_t *thunk, void *varg)
@@ -106,9 +112,7 @@ write_once(fd_init_fn fn)
 
 	work_free(&work);
 }
-
-START_TEST(pipe_write_once) { write_once(&NEM_fd_init_pipe); } END_TEST
-START_TEST(unix_write_once) { write_once(&NEM_fd_init_unix); } END_TEST
+DEFINE_TESTS(write_once);
 
 static void
 echo_rcb(NEM_thunk1_t *thunk, void *varg)
@@ -178,20 +182,86 @@ echo(fd_init_fn fn)
 
 	work_free(&work);
 }
+DEFINE_TESTS(echo);
 
-START_TEST(pipe_echo) { echo(&NEM_fd_init_pipe); } END_TEST
-START_TEST(unix_echo) { echo(&NEM_fd_init_unix); } END_TEST
+static void
+err_read_closed_cb(NEM_thunk1_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk1_ptr(thunk);
+	NEM_stream_ca *ca = varg;
+	ck_assert(!NEM_err_ok(ca->err));
+
+	work->state[0] = 1;
+	NEM_app_stop(&work->app);
+}
+
+static void
+err_read_closed(fd_init_fn fn)
+{
+	work_t work;
+	work_init(&work, fn);
+	work.bufs[0] = alloca(6);
+
+	ck_err(NEM_stream_read(work.s_1, work.bufs[0], 6, NEM_thunk1_new_ptr(
+		&err_read_closed_cb,
+		&work
+	)));
+
+	ck_err(NEM_stream_close(work.s_2));
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(1, work.state[0]);
+
+	work_free(&work);
+}
+DEFINE_TESTS(err_read_closed);
+
+static void
+err_read_preclosed(fd_init_fn fn)
+{
+	work_t work;
+	work_init(&work, fn);
+
+	ck_err(NEM_stream_close(work.s_1));
+
+	NEM_err_t err = NEM_stream_read(work.s_1, work.bufs[0], 5, NEM_thunk1_new_ptr(
+		&work_stop_cb,
+		&work
+	));
+	ck_assert(!NEM_err_ok(err));
+
+	work_free(&work);
+}
+DEFINE_TESTS(err_read_preclosed);
+
+static void
+err_write_preclosed(fd_init_fn fn)
+{
+	work_t work;
+	work_init(&work, fn);
+
+	ck_err(NEM_stream_close(work.s_1));
+
+	NEM_err_t err = NEM_stream_write(work.s_1, "hello", 6, NEM_thunk1_new_ptr(
+		&work_stop_cb,
+		&work
+	));
+	ck_assert(!NEM_err_ok(err));
+
+	work_free(&work);
+}
+DEFINE_TESTS(err_write_preclosed);
 
 Suite*
 suite_stream()
 {
 	tcase_t tests[] = {
-		{ "pipe_init_free",  &pipe_init_free  },
-		{ "unix_init_free",  &unix_init_free  },
-		{ "pipe_write_once", &pipe_write_once },
-		{ "unix_write_once", &unix_write_once },
-		{ "pipe_echo",       &pipe_echo       },
-		{ "unix_echo",       &unix_echo       },
+		USE_TESTS(init_free),
+		USE_TESTS(write_once),
+		USE_TESTS(echo),
+		USE_TESTS(err_read_closed),
+		USE_TESTS(err_read_preclosed),
+		USE_TESTS(err_write_preclosed),
 	};
 
 	return tcase_build_suite("stream", tests, sizeof(tests));

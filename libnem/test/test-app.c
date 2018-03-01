@@ -203,7 +203,7 @@ START_TEST(timer_ordering)
 		.n    = 2,
 	};
 
-	NEM_app_after(&work.app, 30, NEM_thunk1_new_ptr(
+	NEM_app_after(&work.app, 40, NEM_thunk1_new_ptr(
 		&timer_ordering_n,
 		&ord30
 	));
