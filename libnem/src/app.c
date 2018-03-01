@@ -62,13 +62,17 @@ NEM_app_timer_schedule(NEM_app_t *this, struct timeval now, NEM_timer_t *next)
 	after_ms += 1000 * (next->invoke_at.tv_sec - now.tv_sec);
 	after_ms += (next->invoke_at.tv_usec - now.tv_usec) / 1000;
 
-	if (after_ms < 0) {
-		after_ms = 0;
-	}
+	// NB: I'm not sure why this needs to be done. According to the
+	// documentation, EV_ADD with the same ident should _update_ the timer
+	// data field -- but this does not appear to be working for some
+	// godforsaken reason. Manually delete and re-add the timer. This returns
+	// ENOENT if the timer isn't currently configured to run, which is ignored.
+	EV_SET(&ev, this->kq, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
+	kevent(this->kq, &ev, 1, NULL, 0, NULL);
 
 	EV_SET(
 		&ev,
-		0,
+		this->kq,
 		EVFILT_TIMER,
 		EV_ADD | EV_ONESHOT,
 		NOTE_MSECONDS,
@@ -219,6 +223,33 @@ NEM_app_defer(NEM_app_t *this, NEM_thunk1_t *cb)
 	NEM_app_after(this, 0, cb);
 }
 
+static const char *
+evfilt_str(int ev)
+{
+	struct {
+		int filt;
+		const char *name;
+	}
+	evs[] = {
+		{ EVFILT_READ,   "read"   },
+		{ EVFILT_WRITE,  "write"  },
+		{ EVFILT_AIO,    "aio"    },
+		{ EVFILT_VNODE,  "vnode"  },
+		{ EVFILT_PROC,   "proc"   },
+		{ EVFILT_SIGNAL, "signal" },
+		{ EVFILT_TIMER,  "timer"  },
+		{ EVFILT_USER,   "user"   },
+	};
+
+	for (size_t i = 0; i < NEM_ARRSIZE(evs); i += 1) {
+		if (evs[i].filt == ev) {
+			return evs[i].name;
+		}
+	}
+
+	return "unknown";
+}
+
 NEM_err_t
 NEM_app_run(NEM_app_t *this)
 {
@@ -233,6 +264,7 @@ NEM_app_run(NEM_app_t *this)
 		if (-1 == kevent(this->kq, NULL, 0, &trig, 1, NULL)) {
 			NEM_panic("NEM_app_run: kevent");
 		}
+
 		if (EV_ERROR == (trig.flags & EV_ERROR)) {
 			// XXX: The thunks should process these errors and we shouldn't
 			// be logging them.

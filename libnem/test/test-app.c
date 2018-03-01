@@ -164,6 +164,68 @@ START_TEST(defer_timer)
 }
 END_TEST
 
+typedef struct {
+	work_t *work;
+	int n;
+	bool stop;
+}
+timer_ordering_t;
+
+static void
+timer_ordering_n(NEM_thunk1_t *thunk, void *varg)
+{
+	timer_ordering_t *ord = NEM_thunk1_ptr(thunk);
+	ck_assert_int_eq(ord->work->ctr, ord->n);
+	ord->work->ctr += 1;
+
+	if (ord->stop) {
+		NEM_app_stop(&ord->work->app);
+	}
+}
+
+START_TEST(timer_ordering)
+{
+	work_t work;
+	work_init(&work);
+
+	timer_ordering_t ord10 = {
+		.work = &work,
+		.n    = 0,
+	};
+
+	NEM_app_after(&work.app, 10, NEM_thunk1_new_ptr(
+		&timer_ordering_n,
+		&ord10
+	));
+
+	timer_ordering_t ord30 = {
+		.work = &work,
+		.n    = 2,
+	};
+
+	NEM_app_after(&work.app, 30, NEM_thunk1_new_ptr(
+		&timer_ordering_n,
+		&ord30
+	));
+
+	timer_ordering_t ord20 = {
+		.work = &work,
+		.n    = 1,
+		.stop = true,
+	};
+
+	NEM_app_after(&work.app, 20, NEM_thunk1_new_ptr(
+		&timer_ordering_n,
+		&ord20
+	));
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(work.ctr, 2);
+
+	work_free(&work);
+}
+END_TEST
+
 Suite*
 suite_app()
 {
@@ -174,6 +236,7 @@ suite_app()
 		{ "defer_parallel", &defer_parallel },
 		{ "defer_chain",    &defer_chain    },
 		{ "defer_timer",    &defer_timer    },
+		{ "timer_ordering", &timer_ordering },
 	};
 
 	return tcase_build_suite("app", tests, sizeof(tests));
