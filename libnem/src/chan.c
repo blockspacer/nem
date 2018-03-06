@@ -121,7 +121,6 @@ NEM_chan_read(NEM_chan_t *this)
 
 		case NEM_CHAN_STATE_FD:
 			if ((this->rmsg->packed.flags & NEM_MSGFLAG_HAS_FD)) {
-			return;
 				int fd;
 				err = NEM_stream_read_fd(this->stream, &fd);
 				if (!NEM_err_ok(err)) {
@@ -178,7 +177,7 @@ NEM_chan_write(NEM_chan_t *this)
 			err = NEM_stream_write(
 				this->stream,
 				&this->wmsg->packed,
-				sizeof(this->wmsg->packed),
+				len,
 				NEM_thunk1_new_ptr(
 					&NEM_chan_on_write,
 					this

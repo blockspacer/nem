@@ -3,6 +3,7 @@
 typedef struct {
 	NEM_app_t app;
 	NEM_chan_t c_1, c_2;
+	int ctr;
 }
 work_t;
 
@@ -66,11 +67,89 @@ START_TEST(init_free)
 }
 END_TEST
 
+static void
+send_empty_msg_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_chan_ca *ca = varg;
+	ck_err(ca->err);
+
+	work->ctr += 1;
+	NEM_app_stop(&work->app);
+
+	ck_assert_int_eq(0, ca->msg->fd);
+	ck_assert_int_eq(0, ca->msg->flags & NEM_MSGFLAG_HAS_FD);
+
+	ck_assert_int_eq(0, ca->msg->packed.header_len);
+	ck_assert_int_eq(0, ca->msg->packed.body_len);
+}
+
+START_TEST(send_empty_msg)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_chan_on_msg(&work.c_1, NEM_thunk_new_ptr(
+		&send_empty_msg_cb,
+		&work
+	));
+
+	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	NEM_chan_send(&work.c_2, msg);
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(1, work.ctr);
+
+	work_free(&work);
+}
+END_TEST
+
+static void
+send_hdr_inline_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_chan_ca *ca = varg;
+	ck_err(ca->err);
+
+	work->ctr += 1;
+	NEM_app_stop(&work->app);
+
+	ck_assert_int_eq(0, ca->msg->fd);
+	ck_assert_int_eq(0, ca->msg->flags & NEM_MSGFLAG_HAS_FD);
+
+	ck_assert_int_eq(6, ca->msg->packed.header_len);
+	ck_assert_int_eq(0, ca->msg->packed.body_len);
+	ck_assert_str_eq("hello", ca->msg->header);
+}
+
+START_TEST(send_hdr_inline)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_chan_on_msg(&work.c_1, NEM_thunk_new_ptr(
+		&send_hdr_inline_cb,
+		&work
+	));
+
+	NEM_msg_t *msg = NEM_msg_alloc(6, 0);
+	memcpy(msg->header, "hello", 6);
+	NEM_chan_send(&work.c_2, msg);
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(1, work.ctr);
+
+	work_free(&work);
+}
+END_TEST
+
 Suite*
 suite_chan()
 {
 	tcase_t tests[] = {
-		{ "init_free", &init_free },
+		{ "init_free",       &init_free       },
+		{ "send_empty_msg",  &send_empty_msg  },
+		{ "send_hdr_inline", &send_hdr_inline },
 	};
 
 	return tcase_build_suite("chan", tests, sizeof(tests));

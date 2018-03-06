@@ -67,8 +67,8 @@ NEM_msglist_t;
 
 static const uint8_t
 	NEM_MSGFLAG_HEADER_INLINE = 1 << 0, // header is inlined.
-	NEM_MSGFLAG_BODY_INLINE  = 1 << 1, // body is inlined.
-	NEM_MSGFLAG_HAS_FD       = 1 << 2; // fd is set.
+	NEM_MSGFLAG_BODY_INLINE   = 1 << 1, // body is inlined.
+	NEM_MSGFLAG_HAS_FD        = 1 << 2; // fd is set.
 
 // NEM_msg_alloc allocates a new NEM_msg_t. If header_len/body_len are
 // provided, the header/body fields are pre-allocated with a single

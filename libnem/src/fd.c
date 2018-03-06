@@ -98,6 +98,18 @@ NEM_fd_on_read(NEM_fd_t *this, size_t avail)
 {
 	this->ravail = avail;
 
+	// NB: This is kind of a dirty hack for zero-length reads, but
+	// it's unfortunately necessary. There's probably a better way to
+	// structure it but alas.
+	if (NULL != this->on_read && 0 == this->rcap) {
+		NEM_stream_ca ca = {
+			.err    = NEM_err_none,
+			.stream = NEM_fd_as_stream(this),
+		};
+		NEM_thunk1_invoke(&this->on_read, &ca);
+		return;
+	}
+
 	if (NULL == this->on_read || avail == 0) {
 		return;
 	}
