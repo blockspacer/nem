@@ -25,6 +25,7 @@
 #include "nem-stream.h"
 #include "nem-fd.h"
 #include "nem-list.h"
+#include "nem-dial.h"
 #include "nem-msg.h"
 #include "nem-chan.h"
 

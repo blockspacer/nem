@@ -52,6 +52,7 @@ static void
 NEM_list_base_free_fd(NEM_thunk1_t *thunk, void *varg)
 {
 	NEM_fd_t *fd = NEM_thunk1_ptr(thunk);
+	NEM_fd_free(fd);
 	free(fd);
 }
 
