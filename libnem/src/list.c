@@ -31,6 +31,7 @@ NEM_list_unix_close(void *vthis)
 	free(this->path);
 
 	NEM_thunk_free(this->base.on_kevent);
+	NEM_thunk_free(this->base.on_stream);
 	free(this);
 }
 
@@ -41,6 +42,10 @@ NEM_list_tcp_close(void *vthis)
 	if (0 != close(this->base.fd)) {
 		NEM_panicf_errno("NEM_list_tcp_close");
 	}
+
+	NEM_thunk_free(this->base.on_kevent);
+	NEM_thunk_free(this->base.on_stream);
+	free(this);
 }
 
 static void
@@ -53,7 +58,7 @@ NEM_list_base_free_fd(NEM_thunk1_t *thunk, void *varg)
 static void
 NEM_list_base_on_kevent(NEM_thunk_t *thunk, void *varg)
 {
-	NEM_list_t *list = NEM_thunk_ptr(thunk);
+	NEM_list_t *list = NEM_thunk_inlineptr(thunk);
 	NEM_list_base_t *this = list->this;
 
 	int fd = accept(this->fd, NULL, NULL);
@@ -128,12 +133,12 @@ NEM_list_init_unix(
 
 	NEM_list_unix_t *uthis = NEM_malloc(sizeof(NEM_list_unix_t));
 	thunk = NEM_thunk_new(&NEM_list_base_on_kevent, sizeof(NEM_list_t));
-	NEM_list_t *tlist = NEM_thunk_ptr(thunk);
+	NEM_list_t *tlist = NEM_thunk_inlineptr(thunk);
 	tlist->this = uthis;
 	tlist->vt = &NEM_list_unix_vt;
 
 	struct kevent ev;
-	EV_SET(&ev, fd_list, EVFILT_READ, 0, 0, 0, thunk);
+	EV_SET(&ev, fd_list, EVFILT_READ, EV_ADD, 0, 0, thunk);
 	if (-1 == kevent(kq, &ev, 1, NULL, 0, NULL)) {
 		err = NEM_err_errno();
 		goto done;
@@ -216,12 +221,12 @@ NEM_list_init_tcp(
 
 	NEM_list_tcp_t *uthis = NEM_malloc(sizeof(NEM_list_tcp_t));
 	thunk = NEM_thunk_new(&NEM_list_base_on_kevent, sizeof(NEM_list_t));
-	NEM_list_t *tlist = NEM_thunk_ptr(thunk);
+	NEM_list_t *tlist = NEM_thunk_inlineptr(thunk);
 	tlist->this = uthis;
 	tlist->vt = &NEM_list_tcp_vt;
 
 	struct kevent ev;
-	EV_SET(&ev, fd_list, EVFILT_READ, 0, 0, 0, thunk);
+	EV_SET(&ev, fd_list, EVFILT_READ, EV_ADD, 0, 0, thunk);
 	if (-1 == kevent(kq, &ev, 1, NULL, 0, NULL)) {
 		err = NEM_err_errno();
 		goto done;
