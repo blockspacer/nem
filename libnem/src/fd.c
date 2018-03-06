@@ -446,13 +446,65 @@ NEM_fd_write(NEM_fd_t *this, void *buf, size_t len, NEM_thunk1_t *cb)
 NEM_err_t
 NEM_fd_read_fd(NEM_fd_t *this, int *fdout)
 {
-	NEM_panic("TODO");
+	size_t len = CMSG_SPACE(sizeof(*fdout));
+	char *buf = alloca(len);
+
+	struct msghdr msg = {
+		.msg_control    = buf,
+		.msg_controllen = len,
+	};
+
+	if (-1 == recvmsg(this->fd_in, &msg, MSG_CMSG_CLOEXEC)) {
+		return NEM_err_errno();
+	}
+
+	struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+	if (SOL_SOCKET != cmsg->cmsg_level) {
+		return NEM_err_static("NEM_fd_read_fd: cmsg_level");
+	}
+	if (SCM_RIGHTS != cmsg->cmsg_type) {
+		return NEM_err_static("NEM_fd_read_fd: cmsg_type");
+	}
+	if (sizeof(*fdout) > cmsg->cmsg_len) {
+		return NEM_err_static("NEM_fd_read_fd: cmsg_len");
+	}
+
+	memcpy(fdout, CMSG_DATA(cmsg), sizeof(*fdout));
+
+	// NB: Double-check that this is actually a file descriptor.
+	if (-1 == fcntl(*fdout, F_GETFD)) {
+		*fdout = 0;
+		return NEM_err_static("NEM_fd_read_fd: didn't get a real fd?");
+	}
+
+	return NEM_err_none;
 }
 
 NEM_err_t
 NEM_fd_write_fd(NEM_fd_t *this, int fd)
 {
-	NEM_panic("TODO");
+	size_t len = CMSG_SPACE(sizeof(fd));
+	char *buf = alloca(len);
+	bzero(buf, len);
+
+	struct msghdr msg = {
+		.msg_control    = buf,
+		.msg_controllen = len,
+	};
+
+	struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_RIGHTS;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(fd));
+
+	memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
+	msg.msg_controllen = cmsg->cmsg_len;
+
+	if (-1 == sendmsg(this->fd_out, &msg, 0)) {
+		return NEM_err_errno();
+	}
+
+	return NEM_err_none;
 }
 
 void

@@ -31,7 +31,7 @@ work_init(work_t *work)
 
 	NEM_fd_t *fd1 = NEM_malloc(sizeof(NEM_fd_t));
 	NEM_fd_t *fd2 = NEM_malloc(sizeof(NEM_fd_t));
-	ck_err(NEM_fd_init_pipe(fd1, fd2, work->app.kq));
+	ck_err(NEM_fd_init_unix(fd1, fd2, work->app.kq));
 
 	NEM_fd_on_close(fd1, NEM_thunk1_new_ptr(
 		&work_close_fd,
@@ -330,6 +330,46 @@ START_TEST(send_hdrbody)
 }
 END_TEST
 
+static void
+send_fd_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_chan_ca *ca = varg;
+	ck_err(ca->err);
+
+	work->ctr += 1;
+	ck_assert_int_ne(0, ca->msg->fd);
+	ck_assert_int_ne(0, ca->msg->flags & NEM_MSGFLAG_HAS_FD);
+	ck_assert_int_eq(0, ca->msg->packed.header_len);
+	ck_assert_int_eq(0, ca->msg->packed.body_len);
+	ck_assert_ptr_eq(NULL, ca->msg->header);
+	ck_assert_ptr_eq(NULL, ca->msg->body);
+	ck_assert_int_eq(0, close(ca->msg->fd));
+
+	NEM_app_stop(&work->app);
+}
+
+START_TEST(send_fd)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_chan_on_msg(&work.c_1, NEM_thunk_new_ptr(
+		&send_fd_cb,
+		&work
+	));
+
+	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	ck_err(NEM_msg_set_fd(msg, STDOUT_FILENO));
+	NEM_chan_send(&work.c_2, msg);
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(1, work.ctr);
+
+	work_free(&work);
+}
+END_TEST
+
 Suite*
 suite_chan()
 {
@@ -344,6 +384,7 @@ suite_chan()
 		{ "send_hdrbody_ihdr",   &send_hdrbody_ihdr   },
 		{ "send_hdrbody_ibody",  &send_hdrbody_ibody  },
 		{ "send_hdrbody",        &send_hdrbody        },
+		{ "send_fd",             &send_fd             },
 	};
 
 	return tcase_build_suite("chan", tests, sizeof(tests));

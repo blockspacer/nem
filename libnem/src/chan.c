@@ -104,7 +104,10 @@ NEM_chan_read(NEM_chan_t *this)
 				this->pmsg.header_len,
 				this->pmsg.body_len
 			);
+
+			this->rmsg->packed = this->pmsg;
 			bzero(&this->pmsg, sizeof(this->pmsg));
+
 			err = NEM_stream_read(
 				this->stream,
 				this->rmsg->appended,
@@ -120,7 +123,7 @@ NEM_chan_read(NEM_chan_t *this)
 			break;
 
 		case NEM_CHAN_STATE_FD:
-			if ((this->rmsg->packed.flags & NEM_MSGFLAG_HAS_FD)) {
+			if ((this->rmsg->packed.flags & NEM_PMSGFLAG_FD)) {
 				int fd;
 				err = NEM_stream_read_fd(this->stream, &fd);
 				if (!NEM_err_ok(err)) {
