@@ -143,13 +143,76 @@ START_TEST(send_hdr_inline)
 }
 END_TEST
 
+START_TEST(send_hdr)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_chan_on_msg(&work.c_1, NEM_thunk_new_ptr(
+		&send_hdr_inline_cb,
+		&work
+	));
+
+	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	ck_err(NEM_msg_set_header(msg, strdup("hello"), 6));
+	NEM_chan_send(&work.c_2, msg);
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(1, work.ctr);
+
+	work_free(&work);
+}
+END_TEST
+
+static void
+send_hdrbody_inline_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_chan_ca *ca = varg;
+	ck_err(ca->err);
+
+	work->ctr += 1;
+	ck_assert_int_eq(0, ca->msg->fd);
+	ck_assert_int_eq(0, ca->msg->flags & NEM_MSGFLAG_HAS_FD);
+	ck_assert_int_eq(6, ca->msg->packed.header_len);
+	ck_assert_int_eq(6, ca->msg->packed.body_len);
+	ck_assert_str_eq("hello", ca->msg->header);
+	ck_assert_str_eq("world", ca->msg->body);
+
+	NEM_app_stop(&work->app);
+}
+
+START_TEST(send_hdrbody_inline)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_chan_on_msg(&work.c_1, NEM_thunk_new_ptr(
+		&send_hdrbody_inline_cb,
+		&work
+	));
+
+	NEM_msg_t *msg = NEM_msg_alloc(6, 6);
+	memcpy(msg->header, "hello", 6);
+	memcpy(msg->body, "world", 6);
+	NEM_chan_send(&work.c_2, msg);
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(1, work.ctr);
+
+	work_free(&work);
+}
+END_TEST
+
 Suite*
 suite_chan()
 {
 	tcase_t tests[] = {
-		{ "init_free",       &init_free       },
-		{ "send_empty_msg",  &send_empty_msg  },
-		{ "send_hdr_inline", &send_hdr_inline },
+		{ "init_free",           &init_free           },
+		{ "send_empty_msg",      &send_empty_msg      },
+		{ "send_hdr_inline",     &send_hdr_inline     },
+		{ "send_hdr",            &send_hdr            },
+		{ "send_hdrbody_inline", &send_hdrbody_inline },
 	};
 
 	return tcase_build_suite("chan", tests, sizeof(tests));

@@ -168,10 +168,11 @@ NEM_chan_write(NEM_chan_t *this)
 			if ((this->wmsg->flags & NEM_MSGFLAG_HEADER_INLINE)) {
 				len += this->wmsg->packed.header_len;
 				this->wstate = NEM_CHAN_STATE_BODY;
-			}
-			if ((this->wmsg->flags & NEM_MSGFLAG_BODY_INLINE)) {
-				len += this->wmsg->packed.body_len;
-				this->wstate = NEM_CHAN_STATE_FD;
+
+				if ((this->wmsg->flags & NEM_MSGFLAG_BODY_INLINE)) {
+					len += this->wmsg->packed.body_len;
+					this->wstate = NEM_CHAN_STATE_FD;
+				}
 			}
 
 			err = NEM_stream_write(
