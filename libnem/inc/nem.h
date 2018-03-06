@@ -4,6 +4,8 @@
 #include <sys/tree.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -22,6 +24,7 @@
 #include "nem-panic.h"
 #include "nem-stream.h"
 #include "nem-fd.h"
+#include "nem-list.h"
 #include "nem-msg.h"
 #include "nem-chan.h"
 
