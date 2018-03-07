@@ -154,15 +154,42 @@ NEM_app_init_internal(NEM_app_t *this)
 	return NEM_err_none;
 }
 
+static void
+NEM_app_free_fd(NEM_thunk1_t *thunk, void *varg)
+{
+	NEM_fd_t *fd = NEM_thunk1_ptr(thunk);
+	NEM_fd_free(fd);
+	free(fd);
+}
+
 NEM_err_t
 NEM_app_init(NEM_app_t *this)
 {
+	// Pre-emptively check to see if the fd is valid.
+	if (-1 == fcntl(NEM_APP_FILENO, F_GETFD)) {
+		return NEM_err_errno();
+	}
+
 	NEM_err_t err = NEM_app_init_internal(this);
 	if (!NEM_err_ok(err)) {
 		return err;
 	}
 
-	NEM_panic("TODO: NEM_app_init: initialize parent stream ?");
+	NEM_fd_t *fd = NEM_malloc(sizeof(NEM_fd_t));
+	err = NEM_fd_init(fd, this->kq, NEM_APP_FILENO);
+	if (!NEM_err_ok(err)) {
+		free(fd);
+		return err;
+	}
+
+	NEM_fd_on_close(fd, NEM_thunk1_new_ptr(
+		&NEM_app_free_fd,
+		fd
+	));
+
+	this->chan = NEM_malloc(sizeof(NEM_chan_t));
+	NEM_chan_init(this->chan, NEM_fd_as_stream(fd));
+	return NEM_err_none;
 }
 
 NEM_err_t
@@ -176,6 +203,11 @@ NEM_app_free(NEM_app_t *this)
 {
 	if (this->running) {
 		NEM_panic("NEM_app_free: app still running!");
+	}
+
+	if (NULL != this->chan) {
+		NEM_chan_free(this->chan);
+		free(this->chan);
 	}
 
 	NEM_timer_t *timer = NULL;

@@ -6,54 +6,58 @@
 #include "nem.h"
 
 static void
-log_msg(const char *format, ...)
+NEM_panic_if_err(NEM_err_t err)
 {
-	va_list ap;
-	va_start(ap, format);
-	char *msgstr;
-	size_t len = vasprintf(&msgstr, format, ap);
-	va_end(ap);
+	if (!NEM_err_ok(err)) {
+		NEM_panicf("Error: %s", NEM_err_string(err));
+	}
+}
 
-	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
-	NEM_msg_set_body(msg, msgstr, len + 1);
-	write(STDOUT_FILENO, &msg->packed, sizeof(msg->packed));
-	if (NULL != msg->header) {
-		write(STDOUT_FILENO, msg->header, msg->packed.header_len);
+static void
+on_msg(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_chan_ca *ca = varg;
+	NEM_panic_if_err(ca->err);
+	NEM_app_t *app = NEM_thunk_ptr(thunk);
+
+	NEM_msg_t *res;
+	printf(
+		"[child] got command %hu (seq=%lu)\n",
+		ca->msg->packed.command_id,
+		ca->msg->packed.seq
+	);
+
+	switch (ca->msg->packed.command_id) {
+		case 1:
+			res = NEM_msg_alloc(0, 6);
+			memcpy(res->body, "hello", 6);
+			res->packed.seq = ca->msg->packed.seq;
+			break;
+
+		case 2:
+			res = NEM_msg_alloc(0, 0);
+			res->packed.seq = ca->msg->packed.seq;
+			NEM_app_stop(app);
+			break;
+
+		default:
+			NEM_panicf("invalid command %d", ca->msg->packed.command_id);
 	}
-	if (NULL != msg->body) {
-		write(STDOUT_FILENO, msg->body, msg->packed.body_len);
-	}
-	NEM_msg_free(msg);
+
+	NEM_chan_send(app->chan, res);
 }
 
 int
 main(int argc, char *argv[])
 {
-	ssize_t r;
-	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	NEM_app_t app;
+	NEM_panic_if_err(NEM_app_init(&app));
 
-	log_msg("read fixed header (%lu)", sizeof(msg->packed));
-	r = read(STDIN_FILENO, &msg->packed, sizeof(msg->packed));
-	if (r != sizeof(msg->packed)) {
-		NEM_panicf("short read: %ld", r);
-	}
+	NEM_chan_on_msg(app.chan, NEM_thunk_new_ptr(
+		&on_msg,
+		&app
+	));
 
-	msg->header = NEM_malloc(msg->packed.header_len);
-	msg->body = NEM_malloc(msg->packed.body_len);
-
-	log_msg("read metadata (%lu)", (size_t) msg->packed.header_len);
-	r = read(STDIN_FILENO, msg->header, msg->packed.header_len);
-	if (r != msg->packed.header_len) {
-		NEM_panicf("short read: %ld", r);
-	}
-
-	log_msg("read data (%lu)", (size_t) msg->packed.body_len);
-	r = read(STDIN_FILENO, msg->body, msg->packed.body_len);
-	if (r != msg->packed.body_len) {
-		NEM_panicf("short read: %ld", r);
-	}
-
-	log_msg("echo %s", msg->body);
-	NEM_msg_free(msg);
-	return 0;
+	NEM_app_run(&app);
+	NEM_app_free(&app);
 }
