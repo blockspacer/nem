@@ -27,6 +27,16 @@ NEM_panic_if_null(void *ptr)
 	return ptr;
 }
 
+// NEM_panic_if_err panics if the error is set. This really shouldn't be
+// used anywhere, but hey.
+static inline void
+NEM_panic_if_err(NEM_err_t err)
+{
+	if (!NEM_err_ok(err)) {
+		NEM_panicf("Error! %s", NEM_err_string(err));
+	}
+}
+
 // NEM_malloc is a wrapper around calloc+panic_if_null.
 static inline void*
 NEM_malloc(size_t len)

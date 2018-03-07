@@ -6,14 +6,6 @@
 #include "nem.h"
 
 static void
-NEM_panic_if_err(NEM_err_t err)
-{
-	if (!NEM_err_ok(err)) {
-		NEM_panicf("Error: %s", NEM_err_string(err));
-	}
-}
-
-static void
 on_msg(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_chan_ca *ca = varg;

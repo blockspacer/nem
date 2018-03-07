@@ -123,14 +123,6 @@ NEM_child_free(NEM_child_t *this)
 }
 
 static void
-NEM_panic_if_err(NEM_err_t err)
-{
-	if (!NEM_err_ok(err)) {
-		NEM_panicf("Error: %s", NEM_err_string(err));
-	}
-}
-
-static void
 on_child_close(NEM_thunk1_t *thunk, void *varg)
 {
 	NEM_app_t *app = NEM_thunk1_ptr(thunk);
