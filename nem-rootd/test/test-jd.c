@@ -154,6 +154,47 @@ START_TEST(two_mounts)
 }
 END_TEST
 
+START_TEST(err_silly_mounts)
+{
+	const char *toml = 
+		"name = 'yep'\n"
+		"exe_path = '/bin/run'\n"
+		"mount = false\n";
+
+	NEM_jd_t jd;
+	NEM_err_t err = NEM_jd_init_toml(&jd, toml, strlen(toml));
+	ck_assert(!NEM_err_ok(err));
+}
+END_TEST
+
+START_TEST(err_no_type)
+{
+	const char *toml = 
+		"name = 'yep'\n"
+		"exe_path = '/bin/run'\n"
+		"[[mount]]\n";
+
+	NEM_jd_t jd;
+	NEM_err_t err = NEM_jd_init_toml(&jd, toml, strlen(toml));
+	ck_assert(!NEM_err_ok(err));
+}
+END_TEST
+
+START_TEST(err_bad_capacity)
+{
+	const char *toml =
+		"name = 'yep'\n"
+		"exe_path = '/bin/run'\n"
+		"[[mount]]\n"
+		"type = 'shared'\n"
+		"capacity = 'yay'\n";
+
+	NEM_jd_t jd;
+	NEM_err_t err = NEM_jd_init_toml(&jd, toml, strlen(toml));
+	ck_assert(!NEM_err_ok(err));
+}
+END_TEST
+
 Suite*
 suite_jd()
 {
@@ -166,6 +207,9 @@ suite_jd()
 		{ "err_no_mounts",    &err_no_mounts    },
 		{ "err_invalid_type", &err_invalid_type },
 		{ "two_mounts",       &two_mounts       },
+		{ "err_silly_mounts", &err_silly_mounts },
+		{ "err_no_type",      &err_no_type      },
+		{ "err_bad_capacity", &err_bad_capacity },
 	};
 
 	return tcase_build_suite("jd", tests, sizeof(tests));
