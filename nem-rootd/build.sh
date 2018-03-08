@@ -15,6 +15,7 @@ LIBS="
 	-licuuc
 	-lcxxrt
 	-lz
+	-lgeom
 	/home/lye/code/libtoml2/bin/libtoml2.a
 "
 
