@@ -6,12 +6,12 @@
 #include "nem.h"
 
 static void
-printconfig(struct gconf *cfg)
+printconfig(struct gconf *cfg, const char *prefix)
 {
 	struct gconfig *entry;
 
 	LIST_FOREACH(entry, cfg, lg_config) {
-		printf("   '%s' = '%s'\n", entry->lg_name, entry->lg_val);
+		printf("%s   '%s' = '%s'\n", prefix, entry->lg_name, entry->lg_val);
 	}
 }
 
@@ -50,14 +50,38 @@ main(int argc, char *argv[])
 		printf("provider\n");
 		printf("   name = %s\n", prov->lg_name);
 		printf("   size = %lu\n", prov->lg_mediasize);
-		printconfig(&prov->lg_config);
+		printconfig(&prov->lg_config, "");
 		printf("geom\n");
 	   	printf("   rank = %u\n", geom->lg_rank);
 		printf("   name = %s\n", geom->lg_name);
-		printconfig(&geom->lg_config);
+		printconfig(&geom->lg_config, "");
 		printf("class\n");
 		printf("   name = %s\n", cls->lg_name);
-		printconfig(&cls->lg_config);
+		printconfig(&cls->lg_config, "");
+
+		if (NULL != LIST_FIRST(&prov->lg_consumers)) {
+			printf("consumers\n");
+		}
+		for (
+			struct gconsumer *consume = LIST_FIRST(&prov->lg_consumers);
+			NULL != consume;
+			consume = LIST_NEXT(consume, lg_consumer)
+		) {
+			struct ggeom *cgeom = consume->lg_geom;
+			struct gclass *ccls = cgeom->lg_class;
+
+			printf("   consume\n");
+			printf("      mode = %s\n", consume->lg_mode);
+			printconfig(&consume->lg_config, "   ");
+			printf("   consume-geom\n");
+			printf("      rank = %u\n", cgeom->lg_rank);
+			printf("      name = %s\n", cgeom->lg_name);
+			printconfig(&cgeom->lg_config, "   ");
+			printf("   consume-class\n");
+			printf("      name = %s\n", ccls->lg_name);
+			printconfig(&ccls->lg_config, "   ");
+		}
+
 		printf("\n");
 	}
 
