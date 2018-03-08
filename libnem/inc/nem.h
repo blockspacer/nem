@@ -14,6 +14,8 @@
 #include <strings.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <libgen.h>
+#include <signal.h>
 
 #define NEM_ARRSIZE(x) (sizeof(x)/sizeof((x)[0]))
 #define NEM_MSIZE(t, f) (sizeof(((t*)0)->f))
@@ -28,5 +30,5 @@
 #include "nem-dial.h"
 #include "nem-msg.h"
 #include "nem-chan.h"
-
 #include "nem-app.h"
+#include "nem-child.h"

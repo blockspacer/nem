@@ -36,3 +36,16 @@ mount them into multiple jails (though this prevents accurate disk tracking).
 
 Anyway each jail needs a thing that describes the images mounted, in which
 order. Figure this goes in a TOML file. With the other bit.
+
+### Images
+
+Images are just identified with a name/SHA256. The SHA256 is used for
+integrity, not identification. The names are opaque strings. The intent is
+that the name can include build versions and such (e.g. by including a git
+commit hash, `service-84f7acd1`). The images are disjoint from the jails;
+images should be immutable. To update the image of a jail, a new image should
+be pushed to the host, then the jail description should be updated.
+
+This design is intentionally not designed orchestration; these low-level 
+components should be usable without orchestration, but should provide enough
+flexibility that orchestration will eventually be possible.
