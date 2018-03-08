@@ -32,3 +32,6 @@ mkdir -p bin
 $CC -o ./bin/server $BUILD_FLAGS $LIBS src/server.c ../libnem/bin/libnem.a
 $CC -o ./bin/client $BUILD_FLAGS $LIBS src/client.c ../libnem/bin/libnem.a
 
+$CC -o ./bin/dump-geom $BUILD_FLAGS $LIBS \
+	src/dump-geom.c ../libnem/bin/libnem.a -lgeom
+
