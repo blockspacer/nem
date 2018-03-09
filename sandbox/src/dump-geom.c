@@ -18,18 +18,6 @@ printconfig(struct gconf *cfg, const char *prefix)
 }
 
 static void
-printprovider(struct gprovider *prov, const char *prefix)
-{
-	char *new_prefix;
-	asprintf(&new_prefix, "%s  ", prefix);
-	printf("%sPROVIDER: %s %p\n", prefix, prov->lg_name, prov->lg_id);
-	printconfig(&prov->lg_config, prefix);
-
-	printgeom(prov->lg_geom, new_prefix);
-	free(new_prefix);
-}
-
-static void
 printconsumer(struct gconsumer *cons, const char *prefix)
 {
 	if (strlen(prefix) > 24) {
@@ -40,8 +28,24 @@ printconsumer(struct gconsumer *cons, const char *prefix)
 	asprintf(&new_prefix, "%s  ", prefix);
 	printf("%sCONSUMER %p\n", prefix, cons->lg_id);
 	printconfig(&cons->lg_config, prefix);
+	
+	printgeom(cons->lg_geom, new_prefix);
 
-	printprovider(cons->lg_provider, new_prefix);
+	free(new_prefix);
+}
+
+static void
+printprovider(struct gprovider *prov, const char *prefix)
+{
+	char *new_prefix;
+	asprintf(&new_prefix, "%s  ", prefix);
+	printf("%sPROVIDER: %s %p\n", prefix, prov->lg_name, prov->lg_id);
+	printconfig(&prov->lg_config, prefix);
+
+	struct gconsumer *cons;
+	LIST_FOREACH(cons, &prov->lg_consumers, lg_consumers) {
+		printconsumer(cons, new_prefix);
+	}
 	free(new_prefix);
 }
 
@@ -57,12 +61,7 @@ printgeom(struct ggeom *geom, const char *prefix)
 
 	struct gprovider *prov;
 	LIST_FOREACH(prov, &geom->lg_provider, lg_provider) {
-		printf("%sPROVIDER: %s\n", new_prefix, prov->lg_name);
-	}
-
-	struct gconsumer *cons;
-	LIST_FOREACH(cons, &geom->lg_consumer, lg_consumer) {
-		printconsumer(cons, new_prefix);
+		printprovider(prov, new_prefix);
 	}
 
 	free(new_prefix);
@@ -73,8 +72,10 @@ printclass(struct gclass *cls)
 {
 	struct ggeom *geom = NULL;
 	LIST_FOREACH(geom, &cls->lg_geom, lg_geom) {
-		printgeom(geom, "");
-		printf("\n");
+		if (1 == geom->lg_rank) {
+			printgeom(geom, "");
+			printf("\n");
+		}
 	}
 }
 
