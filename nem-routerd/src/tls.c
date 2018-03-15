@@ -20,7 +20,7 @@ struct NEM_tls_key_t {
 };
 
 NEM_err_t
-NEM_tls_key_init_file(NEM_tls_key_t *this, const char *path)
+NEM_tls_key_init_file(NEM_tls_key_t **this, const char *path)
 {
 	int fd = open(path, O_RDONLY);
 	if (0 > fd) {
@@ -40,6 +40,7 @@ NEM_tls_key_init_file(NEM_tls_key_t *this, const char *path)
 	}
 
 	NEM_err_t err = NEM_tls_key_init(this, bs, sb.st_size);
+
 	munmap(bs, sb.st_size);
 	close(fd);
 
@@ -47,10 +48,37 @@ NEM_tls_key_init_file(NEM_tls_key_t *this, const char *path)
 }
 
 NEM_err_t
-NEM_tls_key_init(NEM_tls_key_t *this, const void *bs, size_t len)
+NEM_tls_key_init(NEM_tls_key_t **this, const void *bs, size_t len)
 {
-	bzero(this, sizeof(*this));
-	NEM_panic("TODO");
+	*this = NEM_malloc(sizeof(NEM_tls_key_t));
+
+	// NB: mbedtls wants NULL-terminated keys. If the buffer isn't
+	// NULL-terminated, we need to realloc it and make it NULL terminated.
+	char *buf = (char*) bs;
+	if (0 != buf[len - 1]) {
+		buf = NEM_malloc(len + 1);
+		memcpy(buf, bs, len);
+		len += 1;
+	}
+
+	mbedtls_pk_init(&(*this)->key);
+
+	int err = mbedtls_pk_parse_key(
+		&(*this)->key,
+		(const void*) buf,
+		len,
+		NULL,
+		0
+	);
+	if (buf != bs) {
+		free(buf);
+	}
+	if (0 != err) {
+		return NEM_err_mbedtls(err);
+	}
+
+	(*this)->refcount += 1;
+	return NEM_err_none;
 }
 
 static NEM_tls_key_t*
@@ -63,7 +91,8 @@ NEM_tls_key_copy(NEM_tls_key_t *this)
 static void
 NEM_tls_key_free_internal(NEM_tls_key_t *this)
 {
-	NEM_panic("TODO");
+	mbedtls_pk_free(&this->key);
+	free(this);
 }
 
 void

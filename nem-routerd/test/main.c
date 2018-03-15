@@ -3,10 +3,12 @@
 typedef Suite*(*suite_def)();
 
 extern Suite 
-	*suite_error();
+	*suite_error(),
+	*suite_tls();
 
 static suite_def suites[] = {
 	&suite_error,
+	&suite_tls,
 };
 
 int
