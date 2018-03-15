@@ -3,10 +3,10 @@
 typedef Suite*(*suite_def)();
 
 extern Suite 
-	*suite_noop();
+	*suite_error();
 
 static suite_def suites[] = {
-	&suite_noop,
+	&suite_error,
 };
 
 int

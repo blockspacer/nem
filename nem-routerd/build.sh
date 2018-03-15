@@ -16,6 +16,8 @@ LIBS="
 	-lcxxrt
 	-lz
 	-lgeom
+	-lmbedtls
+	-lmbedcrypto
 	/home/lye/code/libtoml2/bin/libtoml2.a
 "
 

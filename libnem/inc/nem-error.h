@@ -1,9 +1,10 @@
 #pragma once
 
 typedef enum {
-	NEM_ERR_SOURCE_NONE   = 0,
-	NEM_ERR_SOURCE_POSIX  = 1,
-	NEM_ERR_SOURCE_STATIC = 2,
+	NEM_ERR_SOURCE_NONE    = 0,
+	NEM_ERR_SOURCE_POSIX   = 1,
+	NEM_ERR_SOURCE_STATIC  = 2,
+	NEM_ERR_SOURCE_MBEDTLS = 3,
 }
 NEM_err_src_t;
 
@@ -27,5 +28,6 @@ NEM_err_ok(NEM_err_t err)
 
 NEM_err_t NEM_err_errno();
 NEM_err_t NEM_err_static(const char *str);
+NEM_err_t NEM_err_mbedtls(int code);
 
 const char* NEM_err_string(NEM_err_t err);
