@@ -808,7 +808,6 @@ NEM_tls_list_init(
 	);
 
 	if (!NEM_err_ok(err)) {
-		NEM_thunk_free(thunk);
 		NEM_tls_list_free(this);
 		return err;
 	}

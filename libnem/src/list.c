@@ -189,6 +189,10 @@ NEM_list_init_tcp(
 		err = NEM_err_errno();
 		goto done;
 	}
+	if (0 >= port || port >= UINT16_MAX) {
+		err = NEM_err_static("NEM_list_init_tcp: invalid port");
+		goto done;
+	}
 
 	struct sockaddr_in addr = {};
 	addr.sin_len = sizeof(addr);

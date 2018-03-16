@@ -47,12 +47,49 @@ START_TEST(tcp_init_free)
 }
 END_TEST
 
+START_TEST(err_tcp_bad_port)
+{
+	int kq = kqueue();
+	ck_assert_int_ne(-1, kq);
+
+	NEM_list_t list;
+	NEM_err_t err = NEM_list_init_tcp(&list, kq, 900000, NULL, NEM_thunk_new(
+		&err_dont_call,
+		0
+	));
+
+	ck_assert(!NEM_err_ok(err));
+	close(kq);
+}
+END_TEST
+
+START_TEST(err_tcp_bad_addr)
+{
+	int kq = kqueue();
+	ck_assert_int_ne(-1, kq);
+
+	NEM_list_t list;
+	NEM_err_t err = NEM_list_init_tcp(
+		&list,
+		kq,
+		1935,
+		"nem.rocks",
+		NEM_thunk_new(&err_dont_call, 0)
+	);
+
+	ck_assert(!NEM_err_ok(err));
+	close(kq);
+}
+END_TEST
+
 Suite*
 suite_list()
 {
 	tcase_t tests[] = {
-		{ "unix_init_free", &unix_init_free },
-		{ "tcp_init_free",  &tcp_init_free  },
+		{ "unix_init_free",   &unix_init_free   },
+		{ "tcp_init_free",    &tcp_init_free    },
+		{ "err_tcp_bad_port", &err_tcp_bad_port },
+		{ "err_tcp_bad_addr", &err_tcp_bad_addr },
 	};
 
 	return tcase_build_suite("list", tests, sizeof(tests));

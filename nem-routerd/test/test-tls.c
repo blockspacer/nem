@@ -106,6 +106,60 @@ START_TEST(tls_list_init_free)
 }
 END_TEST
 
+START_TEST(err_tls_list_bad_addr)
+{
+	int kq = kqueue();
+	ck_assert_int_ne(-1, kq);
+
+	NEM_tls_t *tls;
+	ck_err(NEM_tls_init(&tls));
+
+	NEM_list_t list;
+	NEM_err_t err = NEM_tls_list_init(
+		&list,
+		tls,
+		kq,
+		10000,
+		"nem.rocks",
+		NEM_thunk_new_ptr(
+			&never_call,
+			NULL
+		)
+	);
+	ck_assert(!NEM_err_ok(err));
+
+	NEM_tls_free(tls);
+	close(kq);
+}
+END_TEST
+
+START_TEST(err_tls_list_bad_port)
+{
+	int kq = kqueue();
+	ck_assert_int_ne(-1, kq);
+
+	NEM_tls_t *tls;
+	ck_err(NEM_tls_init(&tls));
+
+	NEM_list_t list;
+	NEM_err_t err = NEM_tls_list_init(
+		&list,
+		tls,
+		kq,
+		90000,
+		"127.0.0.1",
+		NEM_thunk_new_ptr(
+			&never_call,
+			NULL
+		)
+	);
+	ck_assert(!NEM_err_ok(err));
+
+	NEM_tls_free(tls);
+	close(kq);
+}
+END_TEST
+
 Suite*
 suite_tls()
 {
@@ -119,6 +173,8 @@ suite_tls()
 		{ "tls_init_free",         &tls_init_free         },
 		{ "tls_add_cert",          &tls_add_cert          },
 		{ "tls_list_init_free",    &tls_list_init_free    },
+		{ "err_tls_list_bad_addr", &err_tls_list_bad_addr },
+		{ "err_tls_list_bad_port", &err_tls_list_bad_port },
 	};
 
 	return tcase_build_suite("tls", tests, sizeof(tests));
