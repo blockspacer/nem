@@ -160,6 +160,29 @@ START_TEST(err_tls_list_bad_port)
 }
 END_TEST
 
+START_TEST(err_tls_list_bad_kq)
+{
+	NEM_tls_t *tls;
+	ck_err(NEM_tls_init(&tls));
+
+	NEM_list_t list;
+	NEM_err_t err = NEM_tls_list_init(
+		&list,
+		tls,
+		-1,
+		9849,
+		NULL,
+		NEM_thunk_new_ptr(
+			&never_call,
+			NULL
+		)
+	);
+	ck_assert(!NEM_err_ok(err));
+
+	NEM_tls_free(tls);
+}
+END_TEST
+
 Suite*
 suite_tls()
 {
@@ -175,6 +198,7 @@ suite_tls()
 		{ "tls_list_init_free",    &tls_list_init_free    },
 		{ "err_tls_list_bad_addr", &err_tls_list_bad_addr },
 		{ "err_tls_list_bad_port", &err_tls_list_bad_port },
+		{ "err_tls_list_bad_kq",   &err_tls_list_bad_kq   },
 	};
 
 	return tcase_build_suite("tls", tests, sizeof(tests));
