@@ -49,6 +49,27 @@ START_TEST(err_cert_invalid_data)
 }
 END_TEST
 
+START_TEST(tls_init_free)
+{
+	NEM_tls_t *tls;
+	ck_err(NEM_tls_init(&tls));
+	NEM_tls_free(tls);
+}
+END_TEST
+
+START_TEST(tls_add_cert)
+{
+	NEM_tls_t *tls;
+	NEM_tls_cert_t *cert;
+	NEM_tls_key_t *key;
+	ck_err(NEM_tls_cert_init_file(&cert, "./test/data/test.nem.rocks.crt"));
+	ck_err(NEM_tls_key_init_file(&key, "./test/data/test.nem.rocks.key"));
+	ck_err(NEM_tls_init(&tls));
+	ck_err(NEM_tls_add_cert(tls, key, cert));
+	NEM_tls_free(tls);
+}
+END_TEST
+
 Suite*
 suite_tls()
 {
@@ -59,6 +80,8 @@ suite_tls()
 		{ "cert_init_free",        &cert_init_free        },
 		{ "err_cert_bad_path",     &err_cert_bad_path     },
 		{ "err_cert_invalid_data", &err_cert_invalid_data },
+		{ "tls_init_free",         &tls_init_free         },
+		{ "tls_add_cert",          &tls_add_cert          },
 	};
 
 	return tcase_build_suite("tls", tests, sizeof(tests));
