@@ -43,9 +43,10 @@ void NEM_tls_free(NEM_tls_t *this);
 
 NEM_err_t NEM_tls_list_init(
 	NEM_list_t  *list,
-	int          kq,
 	NEM_tls_t   *tls,
+	int          kq,
 	int          port,
+	const char  *addr,
 	NEM_thunk_t *on_stream
 );
 
