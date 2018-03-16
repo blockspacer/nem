@@ -231,7 +231,6 @@ NEM_tls_init(NEM_tls_t **this)
 	self->refcount = 1;
 	*this = self;
 	return NEM_err_none;
-
 }
 
 void
@@ -699,7 +698,10 @@ static NEM_list_t NEM_tls_list_as_list(NEM_tls_list_t *this);
 static void
 NEM_tls_list_free(NEM_tls_list_t *this)
 {
-	NEM_list_close(this->listener);
+	if (NULL != this->listener.this) {
+		NEM_list_close(this->listener);
+	}
+
 	NEM_thunk_free(this->on_stream);
 	NEM_tls_free(this->tls);
 	free(this);

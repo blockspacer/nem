@@ -70,6 +70,42 @@ START_TEST(tls_add_cert)
 }
 END_TEST
 
+static void
+never_call(NEM_thunk_t *thunk, void *varg)
+{
+	ck_assert_msg(false, "never_call called");
+}
+
+START_TEST(tls_list_init_free)
+{
+	int kq = kqueue();
+	ck_assert_int_ne(-1, kq);
+
+	NEM_tls_t *tls;
+	ck_err(NEM_tls_init(&tls));
+
+	NEM_list_t list;
+	ck_err(NEM_tls_list_init(
+		&list,
+		tls,
+		kq,
+		10000,
+		NULL,
+		NEM_thunk_new_ptr(
+			&never_call,
+			NULL
+		)
+	));
+
+	ck_assert_ptr_ne(list.this, NULL);
+	ck_assert_ptr_ne(list.vt, NULL);
+	
+	NEM_list_close(list);
+	NEM_tls_free(tls);
+	close(kq);
+}
+END_TEST
+
 Suite*
 suite_tls()
 {
@@ -82,6 +118,7 @@ suite_tls()
 		{ "err_cert_invalid_data", &err_cert_invalid_data },
 		{ "tls_init_free",         &tls_init_free         },
 		{ "tls_add_cert",          &tls_add_cert          },
+		{ "tls_list_init_free",    &tls_list_init_free    },
 	};
 
 	return tcase_build_suite("tls", tests, sizeof(tests));
