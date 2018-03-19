@@ -33,3 +33,4 @@
 #include "nem-chan.h"
 #include "nem-app.h"
 #include "nem-child.h"
+#include "nem-services.h"
