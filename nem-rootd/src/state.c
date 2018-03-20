@@ -57,13 +57,13 @@ dupe_arg(int argc, char *argv[])
 	exit(1);
 }
 
-static bool
+static NEM_err_t
 parse_options(int argc, char *argv[])
 {
 	rootd_path = strdup(argv[0]);
 
-	char ch;
-	int idx;
+	char ch = 0;
+	int idx = 0;
 	while (-1 != (ch = getopt_long(argc, argv, "vr0", longopts, &idx))) {
 		switch (ch) {
 			case 'v':
@@ -71,7 +71,7 @@ parse_options(int argc, char *argv[])
 				break;
 			default:
 				usage();
-				return false;
+				return NEM_err_static("parse_options: invalid option");
 		}
 		switch (idx) {
 			case OPT_VERBOSE:
@@ -88,7 +88,7 @@ parse_options(int argc, char *argv[])
 				break;
 			default:
 				usage();
-				return false;
+				return NEM_err_static("parse_options: invalid option");
 		}
 	}
 
@@ -101,41 +101,78 @@ parse_options(int argc, char *argv[])
 		jail_root = strdup("./jails");
 	}
 
-	return true;
+	return NEM_err_none;
 }
 
 static void
-resolve_path(char **path)
+path_to_abs(char **path)
 {
 	char *tmp = *path;
 	*path = NEM_panic_if_null(realpath(*path, NULL));
 	free(tmp);
 }
 
+static mode_t
+get_rights_stat(struct stat *sb)
+{
+	mode_t mask = S_IRWXO;
+
+	if (getuid() == sb->st_uid) {
+		mask |= S_IRWXU;
+	}
+	if (getgid() == sb->st_gid) {
+		mask |= S_IRWXG;
+	}
+
+	return sb->st_mode & mask;
+}
+
 static bool
+can_exe_stat(struct stat *sb)
+{
+	mode_t mode = get_rights_stat(sb);
+	return 0 != (mode & (S_IXUSR | S_IXGRP | S_IXOTH));
+}
+
+static bool
+can_write_stat(struct stat *sb)
+{
+	mode_t mode = get_rights_stat(sb);
+	return 0 != (mode & (S_IWUSR | S_IWGRP | S_IWOTH));
+}
+
+static NEM_err_t
 check_options()
 {
 	struct stat sb;
 
 	if (0 != stat(routerd_path, &sb) || !S_ISREG(sb.st_mode)) {
-		printf("missing routerd: at %s\n", routerd_path);
-		return false;
+		if (verbose) {
+			printf("ERROR: missing routerd: at %s\n", routerd_path);
+		}
+		return NEM_err_static("check_options: invalid routerd-path");
 	}
-	// XXX: Check if we can execute.
+	if (!can_exe_stat(&sb)) {
+		return NEM_err_static("check_options: routerd-path not executable");
+	}
 
 	if (0 != stat(jail_root, &sb) || !S_ISDIR(sb.st_mode)) {
-		printf("missing jailroot: at %s\n", jail_root);
-		return false;
+		if (verbose) {
+			printf("ERROR: missing jailroot: at %s\n", jail_root);
+		}
+		return NEM_err_static("check_options: missing or invalid jail-root");
 	}
-	// XXX: Check if we can write.
+	if (!can_write_stat(&sb)) {
+		return NEM_err_static("check_options: jail-root not writable");
+	}
 
-	resolve_path(&rootd_path);
-	resolve_path(&routerd_path);
-	resolve_path(&jail_root);
-	return true;
+	path_to_abs(&rootd_path);
+	path_to_abs(&routerd_path);
+	path_to_abs(&jail_root);
+	return NEM_err_none;
 }
 
-bool
+NEM_err_t
 NEM_rootd_state_init(int argc, char *argv[])
 {
 	if (1 == getpid()) {
@@ -144,25 +181,31 @@ NEM_rootd_state_init(int argc, char *argv[])
 	if (0 == geteuid()) {
 		is_root = true;
 	}
-	if (!parse_options(argc, argv)) {
-		return false;
+	NEM_err_t err = parse_options(argc, argv);
+	if (!NEM_err_ok(err)) {
+		return err;
 	}
-	/*
-	if (!check_options()) {
-		return false;
+
+	err = check_options();
+	if (!NEM_err_ok(err)) {
+		return err;
 	}
-	*/
 
-	printf(
-		"verbose=%d\nreload=%d\nrootd_path=%s\nrouterd_path=%s\njail_root=%s\n",
-		verbose,
-		reload,
-		rootd_path,
-		routerd_path,
-		jail_root
-	);
+	if (verbose) {
+		printf(
+			"nem-rootd starting\n"
+			"   reload       = %d\n"
+			"   rootd-path   = %s\n"
+			"   routerd-path = %s\n"
+			"   jail-root    = %s\n",
+			reload,
+			rootd_path,
+			routerd_path,
+			jail_root
+		);
+	}
 
-	return false;
+	return NEM_err_none;
 }
 
 void
