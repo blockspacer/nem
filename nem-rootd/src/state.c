@@ -221,3 +221,15 @@ NEM_rootd_verbose()
 {
 	return verbose;
 }
+
+const char*
+NEM_rootd_routerd_path()
+{
+	return routerd_path;
+}
+
+const char*
+NEM_rootd_jail_root()
+{
+	return jail_root;
+}

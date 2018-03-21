@@ -33,7 +33,10 @@ on_kevent(NEM_thunk_t *thunk, void *varg)
 	struct kevent *kev = varg;
 
 	if (NEM_rootd_verbose()) {
-		printf("got %s; shutting down\n", sig_to_string((int)kev->ident));
+		printf(
+			"c-signal: got %s; shutting down\n",
+			sig_to_string((int)kev->ident)
+		);
 	}
 
 	NEM_rootd_shutdown();
@@ -46,6 +49,10 @@ setup(NEM_app_t *app)
 		SIGINT,
 		SIGQUIT,
 	};
+
+	if (NEM_rootd_verbose()) {
+		printf("c-signal: startup\n");
+	}
 
 	struct kevent kev[NEM_ARRSIZE(sigs)];
 	kevent_thunk = NEM_thunk_new(&on_kevent, 0);
@@ -73,6 +80,10 @@ setup(NEM_app_t *app)
 static void
 teardown()
 {
+	if (NEM_rootd_verbose()) {
+		printf("c-signal: teardown\n");
+	}
+
 	if (NULL != kevent_thunk) {
 		NEM_thunk_free(kevent_thunk);
 	}
