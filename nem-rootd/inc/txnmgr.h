@@ -39,7 +39,7 @@ typedef struct {
 NEM_rootd_txn_ca;
 
 typedef struct {
-	NEM_chan_t    chan;
+	NEM_chan_t   *chan;
 	uint64_t      next_seq;
 	NEM_thunk_t  *on_req;
 	NEM_thunk1_t *on_close;
@@ -55,9 +55,11 @@ NEM_rootd_txnmgr_t;
 // incoming requests to registered per-service/command thunks. on_req is called
 // whenever an incoming request is received and must be set. on_req is passed
 // a NEM_chan_ca (!!!!) rather than a NEM_rootd_txn_ca.
+// 
+// This does not free the passed chan! The caller still owns it.
 void NEM_rootd_txnmgr_init(
 	NEM_rootd_txnmgr_t *this,
-	NEM_stream_t        stream,
+	NEM_chan_t         *chan,
 	NEM_thunk_t        *on_req
 );
 

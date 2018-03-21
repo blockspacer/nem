@@ -30,7 +30,6 @@ NEM_rootd_txnmgr_shutdown(NEM_rootd_txnmgr_t *this, NEM_err_t err)
 		free(txn);
 	}
 
-	NEM_chan_free(&this->chan);
 	NEM_thunk_free(this->on_req);
 
 	if (NULL != this->on_close) {
@@ -47,7 +46,7 @@ NEM_rootd_cancel_incoming(NEM_rootd_txnmgr_t *this, NEM_msg_t *inc)
 	// incoming request, not sure how those semantics are going to work yet.
 	// XXX: Want to put an error message in the header, but the header wire
 	// format isn't sorted out yet.
-	NEM_chan_send(&this->chan, cancel);
+	NEM_chan_send(this->chan, cancel);
 }
 
 static void
@@ -109,17 +108,17 @@ NEM_rootd_txnmgr_on_msg(NEM_thunk_t *thunk, void *varg)
 void
 NEM_rootd_txnmgr_init(
 	NEM_rootd_txnmgr_t *this,
-	NEM_stream_t        stream,
+	NEM_chan_t         *chan,
 	NEM_thunk_t        *on_req
 ) {
 	bzero(this, sizeof(*this));
-	NEM_chan_init(&this->chan, stream);
+	this->chan = chan;
 	this->next_seq = 1;
 	this->closed = false;
 	this->on_req = on_req;
 	SPLAY_INIT(&this->txns);
 
-	NEM_chan_on_msg(&this->chan, NEM_thunk_new_ptr(
+	NEM_chan_on_msg(this->chan, NEM_thunk_new_ptr(
 		&NEM_rootd_txnmgr_on_msg,
 		this
 	));
@@ -181,5 +180,5 @@ NEM_rootd_txnmgr_req1(
 	msg->packed.seq = this->next_seq;
 	this->next_seq += 1;
 
-	NEM_chan_send(&this->chan, msg);
+	NEM_chan_send(this->chan, msg);
 }

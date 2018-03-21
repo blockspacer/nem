@@ -3,7 +3,7 @@
 
 typedef struct {
 	NEM_app_t app;
-	NEM_stream_t s_1, s_2;
+	NEM_chan_t c_1, c_2;
 }
 work_t;
 
@@ -43,8 +43,8 @@ work_init(work_t *work)
 	NEM_fd_on_close(fd1, fd1_close);
 	NEM_fd_on_close(fd2, fd2_close);
 
-	work->s_1 = NEM_fd_as_stream(fd1);
-	work->s_2 = NEM_fd_as_stream(fd2);
+	NEM_chan_init(&work->c_1, NEM_fd_as_stream(fd1));
+	NEM_chan_init(&work->c_2, NEM_fd_as_stream(fd2));
 
 	NEM_app_after(&work->app, 3000, NEM_thunk1_new_ptr(
 		&work_stop_cb,
@@ -55,6 +55,8 @@ work_init(work_t *work)
 static void
 work_free(work_t *work)
 {
+	NEM_chan_free(&work->c_1);
+	NEM_chan_free(&work->c_2);
 	NEM_app_free(&work->app);
 }
 
@@ -62,8 +64,6 @@ START_TEST(scaffolding)
 {
 	work_t work;
 	work_init(&work);
-	NEM_stream_close(work.s_1);
-	NEM_stream_close(work.s_2);
 	work_free(&work);
 }
 END_TEST
@@ -73,9 +73,8 @@ START_TEST(init_free)
 	work_t work;
 	work_init(&work);
 	NEM_rootd_txnmgr_t mgr;
-	NEM_rootd_txnmgr_init(&mgr, work.s_1, NEM_thunk_new(&never_called, 0));
+	NEM_rootd_txnmgr_init(&mgr, &work.c_1, NEM_thunk_new(&never_called, 0));
 	NEM_rootd_txnmgr_free(&mgr);
-	NEM_stream_close(work.s_2);
 	work_free(&work);
 }
 END_TEST
@@ -111,13 +110,11 @@ START_TEST(roundtrip_txn)
 	work_init(&work);
 
 	NEM_rootd_txnmgr_t mgr;
-	NEM_rootd_txnmgr_init(&mgr, work.s_1, NEM_thunk_new_ptr(
+	NEM_rootd_txnmgr_init(&mgr, &work.c_1, NEM_thunk_new_ptr(
 		&never_called, &work
 	));
 
-	NEM_chan_t chan;
-	NEM_chan_init(&chan, work.s_2);
-	NEM_chan_on_msg(&chan, NEM_thunk_new_ptr(&roundtrip_txn_srv, &work));
+	NEM_chan_on_msg(&work.c_2, NEM_thunk_new_ptr(&roundtrip_txn_srv, &work));
 
 	NEM_rootd_txnmgr_req1(
 		&mgr,
@@ -127,7 +124,6 @@ START_TEST(roundtrip_txn)
 
 	ck_err(NEM_app_run(&work.app));
 
-	NEM_chan_free(&chan);
 	NEM_rootd_txnmgr_free(&mgr);
 	work_free(&work);
 }

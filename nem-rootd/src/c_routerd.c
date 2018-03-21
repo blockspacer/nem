@@ -2,15 +2,87 @@
 #include "state.h"
 #include "lifecycle.h"
 #include "c_routerd.h"
+#include "txnmgr.h"
+#include "svcmgr.h"
 
-static NEM_child_t child;
-static bool        is_running = false;
+static NEM_child_t        child;
+static NEM_rootd_svcmgr_t svcmgr;
+static NEM_rootd_txnmgr_t txnmgr;
+static bool               is_running = false;
 
 static void
 routerd_restart(NEM_thunk1_t *thunk, void *varg)
 {
 	// XXX: Really want some retry semantics here.
 	NEM_rootd_shutdown();
+}
+
+static void
+routerd_dispatch(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_rootd_txn_ca *ca = varg;
+	bool handled = NEM_rootd_svcmgr_dispatch(&svcmgr, ca->msg);
+
+	if (!handled) {
+		if (NEM_rootd_verbose()) {
+			printf(
+				"c-routerd: unhandled seq=%lu, service=%s, command=%s\n",
+				ca->msg->packed.seq,
+				NEM_svcid_to_string(ca->msg->packed.service_id),
+				NEM_cmdid_to_string(
+					ca->msg->packed.service_id,
+					ca->msg->packed.command_id
+				)
+			);
+		}
+
+		// XXX: Send an error reply here. We're not equipped to send errors
+		// currently since the headers and stuff aren't set up yet.
+	}
+}
+
+static NEM_err_t
+routerd_start(NEM_app_t *app)
+{
+	if (is_running) {
+		return NEM_err_static("routerd_start: already running?");
+	}
+
+	NEM_err_t err = NEM_child_init(
+		&child,
+		app->kq,
+		NEM_rootd_routerd_path(),
+		// XXX: May want to bind stdout/stderr to something
+		// so we can track/log output. Just leave them the same
+		// as the parent stdout/stderr for now.
+		NULL
+	);
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
+	err = NEM_child_on_close(
+		&child,
+		NEM_thunk1_new_ptr(
+			&routerd_restart,
+			app
+		)
+	);
+	if (!NEM_err_ok(err)) {
+		NEM_child_free(&child);
+		return err;
+	}
+
+	NEM_rootd_txnmgr_init(&txnmgr, &child.chan, NEM_thunk_new_ptr(
+		&routerd_dispatch,
+		NULL
+	));
+
+	if (NEM_rootd_verbose()) {
+		printf("c-routerd: routerd running, pid=%d\n", child.pid); 
+	}
+
+	is_running = true;
+	return NEM_err_none;
 }
 
 static NEM_err_t
@@ -20,32 +92,9 @@ setup(NEM_app_t *app)
 		printf("c-routerd: setup\n");
 	}
 
-	NEM_err_t err = NEM_child_init(
-		&child,
-		app->kq,
-		NEM_rootd_routerd_path(),
-		// XXX: Might want to bind stdout/stderr to something
-		// so that we can track output. As-is this leaves them bound
-		// to our stdout/stderr which is probably fine.
-		NULL
-	);
-	if (NEM_err_ok(err)) {
-		is_running = true;
+	NEM_rootd_svcmgr_init(&svcmgr);
 
-		err = NEM_child_on_close(
-			&child,
-			NEM_thunk1_new_ptr(
-				routerd_restart,
-				app
-			)
-		);
-	}
-
-	if (NEM_rootd_verbose()) {
-		printf("c-routerd: routerd running, pid=%d\n", child.pid); 
-	}
-
-	return err;
+	return routerd_start(app);
 }
 
 static bool
@@ -63,9 +112,12 @@ teardown()
 		if (NEM_rootd_verbose()) {
 			printf("c-routerd: killing child\n");
 		}
+		NEM_rootd_txnmgr_free(&txnmgr);
 		NEM_child_free(&child);
 		is_running = false;
 	}
+
+	NEM_rootd_svcmgr_free(&svcmgr);
 }
 
 const NEM_rootd_comp_t NEM_rootd_c_routerd = {
