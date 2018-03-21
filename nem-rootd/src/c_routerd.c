@@ -158,6 +158,25 @@ setup(NEM_app_t *app)
 	return routerd_start(app);
 }
 
+static void
+on_shutdown_msg(NEM_thunk1_t *thunk, void *varg)
+{
+	NEM_rootd_txn_ca *ca = varg;
+	if (!NEM_err_ok(ca->err)) {
+		if (NEM_rootd_verbose()) {
+			printf(
+				"c-routerd: error sending shutdown message: %s\n",
+				NEM_err_string(ca->err)
+			);
+		}
+	}
+	else {
+		if (NEM_rootd_verbose()) {
+			printf("c-routerd: client shutdown acknowledged\n");
+		}
+	}
+}
+
 static bool
 try_shutdown()
 {
@@ -165,9 +184,19 @@ try_shutdown()
 	want_running = false;
 
 	if (is_running && !shutdown_sent) {
+		shutdown_sent = true;
+
+		NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+		msg->packed.service_id = NEM_svcid_daemon;
+		msg->packed.command_id = NEM_cmdid_daemon_stop;
+		NEM_rootd_txnmgr_req1(
+			&txnmgr,
+			msg,
+			NEM_thunk1_new(&on_shutdown_msg, 0)
+		);
 	}
 
-	return is_running;
+	return !is_running;
 }
 
 static void
