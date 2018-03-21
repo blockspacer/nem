@@ -1,10 +1,13 @@
 #include "nem.h"
 #include "lifecycle.h"
 
+extern const NEM_rootd_comp_t
+	NEM_rootd_c_signal;
+
 int
 main(int argc, char *argv[])
 {
-	// XXX: Add components here.
+	NEM_rootd_add_comp(&NEM_rootd_c_signal);
 
 	NEM_err_t err = NEM_rootd_main(argc, argv);
 	if (!NEM_err_ok(err)) {

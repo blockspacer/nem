@@ -22,10 +22,10 @@ enum {
 	OPT_JAIL_ROOT,
 };
 static struct option longopts[] = {
-	{ "verbose",      optional_argument, &verbose, 'v' },
-	{ "reload",       optional_argument, &reload,   0  },
-	{ "routerd-path", optional_argument, NULL,      0  },
-	{ "jail-root",    optional_argument, NULL,      0  },
+	{ "verbose",   optional_argument, &verbose, 'v' },
+	{ "reload",    optional_argument, &reload,   0  },
+	{ "routerd",   optional_argument, NULL,      0  },
+	{ "jail-root", optional_argument, NULL,      0  },
 	{ 0 },
 };
 
@@ -34,10 +34,10 @@ usage()
 {
 	printf(
 		"Usage: %s\n"
-		"  --verbose, -v:       be noisy\n"
-		"  --reload:            internal usage\n"
-		"  --routerd-path=path: set path to nem-routerd\n"
-		"  --jail-root=path:    set path to jail root dir\n",
+		"  --verbose, -v:    be noisy\n"
+		"  --reload:         internal usage\n"
+		"  --routerd=path:   set path to nem-routerd\n"
+		"  --jail-root=path: set path to jail root dir\n",
 		rootd_path
 	);
 }
@@ -150,10 +150,10 @@ check_options()
 		if (verbose) {
 			printf("ERROR: missing routerd: at %s\n", routerd_path);
 		}
-		return NEM_err_static("check_options: invalid routerd-path");
+		return NEM_err_static("check_options: invalid routerd path");
 	}
 	if (!can_exe_stat(&sb)) {
-		return NEM_err_static("check_options: routerd-path not executable");
+		return NEM_err_static("check_options: routerd path not executable");
 	}
 
 	if (0 != stat(jail_root, &sb) || !S_ISDIR(sb.st_mode)) {
@@ -194,10 +194,10 @@ NEM_rootd_state_init(int argc, char *argv[])
 	if (verbose) {
 		printf(
 			"nem-rootd starting\n"
-			"   reload       = %d\n"
-			"   rootd-path   = %s\n"
-			"   routerd-path = %s\n"
-			"   jail-root    = %s\n",
+			"   reload     = %d\n"
+			"   rootd-path = %s\n"
+			"   routerd    = %s\n"
+			"   jail-root  = %s\n",
 			reload,
 			rootd_path,
 			routerd_path,
@@ -214,4 +214,10 @@ NEM_rootd_state_close()
 	free(rootd_path);
 	free(jail_root);
 	free(routerd_path);
+}
+
+bool
+NEM_rootd_verbose()
+{
+	return verbose;
 }
