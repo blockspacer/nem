@@ -7,7 +7,7 @@ typedef struct {
 cmd_data_t;
 
 static const cmd_data_t daemon_cmds[] = {
-	{ NEM_cmdid_daemon_name,   "name"   },
+	{ NEM_cmdid_daemon_info,   "info"   },
 	{ NEM_cmdid_daemon_getcfg, "getcfg" },
 	{ NEM_cmdid_daemon_setcfg, "setcfg" },
 	{ NEM_cmdid_daemon_stop,   "stop"   },
