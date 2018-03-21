@@ -10,6 +10,7 @@ static NEM_rootd_svcmgr_t svcmgr;
 static NEM_rootd_txnmgr_t txnmgr;
 static bool               is_running = false;
 static bool               want_running = true;
+static bool               shutdown_sent = false;
 
 extern NEM_rootd_svcmgr_t NEM_rootd_svc_daemon;
 
@@ -47,9 +48,13 @@ routerd_restart(NEM_thunk1_t *thunk, void *varg)
 static void
 on_child_died(NEM_thunk1_t *thunk, void *varg)
 {
-	is_running = false;
 	NEM_rootd_txnmgr_free(&txnmgr);
-	NEM_child_free(&child);
+	if (is_running) {
+		// NB: Dirty hack to detect that we're shutting down and that
+		// this was called due to the child being freed.
+		NEM_child_free(&child);
+	}
+	is_running = false;
 
 	if (!want_running) {
 		if (NEM_rootd_verbose()) {
@@ -159,10 +164,10 @@ try_shutdown()
 	printf("c-routerd: try-shutdown\n");
 	want_running = false;
 
-	// XXX: Be more graceful here.
-	NEM_child_stop(&child);
+	if (is_running && !shutdown_sent) {
+	}
 
-	return true;
+	return is_running;
 }
 
 static void
@@ -173,8 +178,10 @@ teardown()
 		if (NEM_rootd_verbose()) {
 			printf("c-routerd: killing child\n");
 		}
-		NEM_child_stop(&child);
+		// NB: Set is_running first to signal that the child shouldn't
+		// be freed by the on_child_died.
 		is_running = false;
+		NEM_child_free(&child);
 	}
 
 	NEM_rootd_svcmgr_free(&svcmgr);
