@@ -69,7 +69,7 @@ static void
 routerd_dispatch(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_chan_ca *ca = varg;
-	bool handled = NEM_rootd_svcmgr_dispatch(&svcmgr, ca->msg);
+	bool handled = NEM_rootd_svcmgr_dispatch(&svcmgr, ca->msg, ca->chan);
 
 	if (!handled) {
 		if (NEM_rootd_verbose()) {

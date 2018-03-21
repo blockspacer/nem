@@ -31,12 +31,12 @@ START_TEST(dispatch_empty)
 
 	NEM_rootd_svcmgr_t mgr;
 	NEM_rootd_svcmgr_init(&mgr);
-	ck_assert(!NEM_rootd_svcmgr_dispatch(&mgr, msg));
+	ck_assert(!NEM_rootd_svcmgr_dispatch(&mgr, msg, NULL));
 
 	NEM_rootd_svcmgr_t sub;
 	NEM_rootd_svcmgr_init(&sub);
 	NEM_rootd_svcmgr_set_next(&mgr, &sub);
-	ck_assert(!NEM_rootd_svcmgr_dispatch(&mgr, msg));
+	ck_assert(!NEM_rootd_svcmgr_dispatch(&mgr, msg, NULL));
 
 	NEM_rootd_svcmgr_free(&sub);
 	NEM_rootd_svcmgr_free(&mgr);
@@ -69,7 +69,7 @@ START_TEST(dispatch_self)
 	ck_err(NEM_rootd_svcmgr_add(&mgr, 2, 1, NEM_thunk_new(NULL, 0)));
 	ck_err(NEM_rootd_svcmgr_add(&mgr, 2, 2, NEM_thunk_new(NULL, 0)));
 
-	ck_assert(NEM_rootd_svcmgr_dispatch(&mgr, msg));
+	ck_assert(NEM_rootd_svcmgr_dispatch(&mgr, msg, NULL));
 	ck_assert_int_eq(1, val);
 
 	NEM_rootd_svcmgr_free(&mgr);
@@ -97,10 +97,48 @@ START_TEST(dispatch_child)
 	ck_err(NEM_rootd_svcmgr_add(&sub, 1, 2, NEM_thunk_new_ptr(&set_ptr, &val)));
 	NEM_rootd_svcmgr_set_next(&mgr, &sub);
 
-	ck_assert(NEM_rootd_svcmgr_dispatch(&mgr, msg));
+	ck_assert(NEM_rootd_svcmgr_dispatch(&mgr, msg, NULL));
 	ck_assert_int_eq(10, val);
 
 	NEM_rootd_svcmgr_free(&sub);
+	NEM_rootd_svcmgr_free(&mgr);
+	NEM_msg_free(msg);
+}
+END_TEST
+
+static void
+dispatch_data_cb(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_rootd_cmd_ca *ca = varg;
+	*ca->handled = false;
+
+	int *val = NEM_thunk_ptr(thunk);
+	*val = 10;
+
+	int *data = (int*) ca->data;
+	ck_assert_int_eq(42, *data);
+}
+
+START_TEST(dispatch_data)
+{
+	int val = 1;
+
+	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	msg->packed.service_id = 1;
+	msg->packed.command_id = 1;
+	msg->packed.seq = 10;
+
+	NEM_rootd_svcmgr_t mgr;
+	NEM_rootd_svcmgr_init(&mgr);
+	ck_err(NEM_rootd_svcmgr_add(&mgr, 1, 1, NEM_thunk_new_ptr(
+		&dispatch_data_cb, &val
+	)));
+
+	int val2 = 42;
+
+	ck_assert(!NEM_rootd_svcmgr_dispatch(&mgr, msg, &val2));
+	ck_assert_int_eq(10, val);
+
 	NEM_rootd_svcmgr_free(&mgr);
 	NEM_msg_free(msg);
 }
@@ -115,6 +153,7 @@ suite_svcmgr()
 		{ "dispatch_empty", &dispatch_empty },
 		{ "dispatch_self",  &dispatch_self  },
 		{ "dispatch_child", &dispatch_child },
+		{ "dispatch_data",  &dispatch_data  },
 	};
 
 	return tcase_build_suite("svcmgr", tests, sizeof(tests));

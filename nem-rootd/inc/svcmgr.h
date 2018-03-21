@@ -37,6 +37,7 @@ RB_PROTOTYPE(
 typedef struct {
 	NEM_msg_t *msg;
 	bool      *handled;
+	void      *data;
 }
 NEM_rootd_cmd_ca;
 
@@ -68,8 +69,14 @@ void NEM_rootd_svcmgr_set_next(
 );
 
 // NEM_rootd_svcmgr_dispatch dispatches a message. It returns true iff there
-// was a matching handler.
-bool NEM_rootd_svcmgr_dispatch(NEM_rootd_svcmgr_t *this, NEM_msg_t *msg);
+// was a matching handler. The data is passed through I'm not sure what needs
+// to go there yet
+// XXX: Figure out what the fuck data needs to be and thread it through.
+bool NEM_rootd_svcmgr_dispatch(
+	NEM_rootd_svcmgr_t *this,
+	NEM_msg_t          *msg,
+	void               *data
+);
 
 // NEM_rootd_svcmgr_add registers a service/command/thunk tuple.
 NEM_err_t NEM_rootd_svcmgr_add(

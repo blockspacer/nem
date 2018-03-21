@@ -44,7 +44,7 @@ NEM_rootd_svcmgr_next_cb(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_rootd_svcmgr_t *this = NEM_thunk_ptr(thunk);
 	NEM_rootd_cmd_ca *ca = varg;
-	*ca->handled = NEM_rootd_svcmgr_dispatch(this, ca->msg);
+	*ca->handled = NEM_rootd_svcmgr_dispatch(this, ca->msg, ca->data);
 }
 
 void
@@ -57,7 +57,7 @@ NEM_rootd_svcmgr_set_next(NEM_rootd_svcmgr_t *this, NEM_rootd_svcmgr_t *next)
 }
 
 bool
-NEM_rootd_svcmgr_dispatch(NEM_rootd_svcmgr_t *this, NEM_msg_t *msg)
+NEM_rootd_svcmgr_dispatch(NEM_rootd_svcmgr_t *this, NEM_msg_t *msg, void *data)
 {
 	NEM_rootd_cmd_t dummy = {
 		.svc_id = msg->packed.service_id,
@@ -70,6 +70,7 @@ NEM_rootd_svcmgr_dispatch(NEM_rootd_svcmgr_t *this, NEM_msg_t *msg)
 	NEM_rootd_cmd_ca ca = {
 		.msg     = msg,
 		.handled = &ret,
+		.data    = data,
 	};
 
 	if (NULL != cmd) {
