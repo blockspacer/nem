@@ -35,8 +35,8 @@ START_TEST(dispatch_empty)
 
 	NEM_rootd_svcmgr_t sub;
 	NEM_rootd_svcmgr_init(&sub);
-	NEM_rootd_svcmgr_on_unmatched(&mgr, NEM_rootd_svcmgr_dispatch_thunk(&sub));
-	ck_assert(NEM_rootd_svcmgr_dispatch(&mgr, msg));
+	NEM_rootd_svcmgr_set_next(&mgr, &sub);
+	ck_assert(!NEM_rootd_svcmgr_dispatch(&mgr, msg));
 
 	NEM_rootd_svcmgr_free(&sub);
 	NEM_rootd_svcmgr_free(&mgr);
@@ -95,7 +95,7 @@ START_TEST(dispatch_child)
 	NEM_rootd_svcmgr_t sub;
 	NEM_rootd_svcmgr_init(&sub);
 	ck_err(NEM_rootd_svcmgr_add(&sub, 1, 2, NEM_thunk_new_ptr(&set_ptr, &val)));
-	NEM_rootd_svcmgr_on_unmatched(&mgr, NEM_rootd_svcmgr_dispatch_thunk(&sub));
+	NEM_rootd_svcmgr_set_next(&mgr, &sub);
 
 	ck_assert(NEM_rootd_svcmgr_dispatch(&mgr, msg));
 	ck_assert_int_eq(10, val);

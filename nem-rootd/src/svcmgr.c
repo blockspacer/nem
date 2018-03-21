@@ -39,6 +39,23 @@ NEM_rootd_svcmgr_on_unmatched(NEM_rootd_svcmgr_t *this, NEM_thunk_t *cb)
 	this->on_unmatched = cb;
 }
 
+static void
+NEM_rootd_svcmgr_next_cb(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_rootd_svcmgr_t *this = NEM_thunk_ptr(thunk);
+	NEM_rootd_cmd_ca *ca = varg;
+	*ca->handled = NEM_rootd_svcmgr_dispatch(this, ca->msg);
+}
+
+void
+NEM_rootd_svcmgr_set_next(NEM_rootd_svcmgr_t *this, NEM_rootd_svcmgr_t *next)
+{
+	NEM_rootd_svcmgr_on_unmatched(this, NEM_thunk_new_ptr(
+		&NEM_rootd_svcmgr_next_cb,
+		next
+	));
+}
+
 bool
 NEM_rootd_svcmgr_dispatch(NEM_rootd_svcmgr_t *this, NEM_msg_t *msg)
 {
@@ -48,37 +65,24 @@ NEM_rootd_svcmgr_dispatch(NEM_rootd_svcmgr_t *this, NEM_msg_t *msg)
 	};
 
 	NEM_rootd_cmd_t *cmd = RB_FIND(NEM_rootd_cmdtree_t, &this->tree, &dummy);
+
+	bool ret = false;
 	NEM_rootd_cmd_ca ca = {
-		.msg = msg,
+		.msg     = msg,
+		.handled = &ret,
 	};
 
 	if (NULL != cmd) {
+		ret = true;
 		NEM_thunk_invoke(cmd->cb, &ca);
-		return true;
+		return ret;
 	}
 	if (NULL != this->on_unmatched) {
 		NEM_thunk_invoke(this->on_unmatched, &ca);
-		return true;
+		return ret;
 	}
 
 	return false;
-}
-
-static void
-NEM_rootd_svcmgr_dispatch_cb(NEM_thunk_t *thunk, void *varg)
-{
-	NEM_rootd_svcmgr_t *this = NEM_thunk_ptr(thunk);
-	NEM_rootd_cmd_ca *ca = varg;
-	NEM_rootd_svcmgr_dispatch(this, ca->msg);
-}
-
-NEM_thunk_t*
-NEM_rootd_svcmgr_dispatch_thunk(NEM_rootd_svcmgr_t *this)
-{
-	return NEM_thunk_new_ptr(
-		&NEM_rootd_svcmgr_dispatch_cb,
-		this
-	);
 }
 
 NEM_err_t
