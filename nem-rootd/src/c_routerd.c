@@ -68,19 +68,22 @@ routerd_restart(NEM_thunk1_t *thunk, void *varg)
 static void
 routerd_dispatch(NEM_thunk_t *thunk, void *varg)
 {
-	NEM_rootd_txn_ca *ca = varg;
+	NEM_chan_ca *ca = varg;
 	bool handled = NEM_rootd_svcmgr_dispatch(&svcmgr, ca->msg);
 
 	if (!handled) {
 		if (NEM_rootd_verbose()) {
 			printf(
-				"c-routerd: unhandled seq=%lu, service=%s, command=%s\n",
+				"c-routerd: unhandled seq=%lu,"
+				" service=%s (%hu), command=%s (%hu)\n",
 				ca->msg->packed.seq,
 				NEM_svcid_to_string(ca->msg->packed.service_id),
+				ca->msg->packed.service_id,
 				NEM_cmdid_to_string(
 					ca->msg->packed.service_id,
 					ca->msg->packed.command_id
-				)
+				),
+				ca->msg->packed.command_id
 			);
 		}
 
