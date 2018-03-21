@@ -11,6 +11,8 @@ static NEM_rootd_txnmgr_t txnmgr;
 static bool               is_running = false;
 static bool               want_running = true;
 
+extern NEM_rootd_svcmgr_t NEM_rootd_svc_daemon;
+
 static NEM_err_t routerd_start(NEM_app_t *app);
 
 static void
@@ -144,6 +146,7 @@ setup(NEM_app_t *app)
 	}
 
 	NEM_rootd_svcmgr_init(&svcmgr);
+	NEM_rootd_svcmgr_set_next(&svcmgr, &NEM_rootd_svc_daemon);
 
 	return routerd_start(app);
 }

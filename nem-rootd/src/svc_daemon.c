@@ -11,6 +11,13 @@ svc_daemon_info(NEM_thunk_t *thunk, void *varg)
 	if (NEM_rootd_verbose()) {
 		printf("c-svc-daemon: info requested\n");
 	}
+
+	NEM_rootd_cmd_ca *ca = varg;
+	NEM_chan_t *chan = ca->data;
+
+	NEM_msg_t *msg = NEM_msg_alloc_reply(ca->msg, 0, 6);
+	snprintf(msg->body, 6, "hello");
+	NEM_chan_send(chan, msg);
 }
 
 static void
