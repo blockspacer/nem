@@ -77,6 +77,7 @@ static const uint8_t
 //
 // If {header,body}_len exceed maximums, NULL is returned.
 NEM_msg_t* NEM_msg_alloc(size_t header_len, size_t body_len);
+NEM_msg_t* NEM_msg_alloc_reply(NEM_msg_t *msg, size_t hlen, size_t blen);
 
 // NEM_msg_free frees a message allocated with NEM_msg_alloc.
 void NEM_msg_free(NEM_msg_t *this);

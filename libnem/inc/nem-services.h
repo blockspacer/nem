@@ -15,7 +15,7 @@ static const uint16_t
 	NEM_svcid_router = 3;
 
 static const uint16_t
-	NEM_cmdid_daemon_info   = 1,
+	NEM_cmdid_daemon_name   = 1,
 	NEM_cmdid_daemon_getcfg = 2,
 	NEM_cmdid_daemon_setcfg = 3,
 	NEM_cmdid_daemon_stop   = 4;

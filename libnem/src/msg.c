@@ -46,6 +46,17 @@ NEM_msg_alloc(size_t header_len, size_t body_len)
 	return msg;
 }
 
+NEM_msg_t*
+NEM_msg_alloc_reply(NEM_msg_t *msg, size_t hlen, size_t blen)
+{
+	NEM_msg_t *this = NEM_msg_alloc(hlen, blen);
+	this->packed.flags |= NEM_PMSGFLAG_REPLY;
+	this->packed.seq = msg->packed.seq;
+	this->packed.service_id = msg->packed.service_id;
+	this->packed.command_id = msg->packed.command_id;
+	return this;
+}
+
 void
 NEM_msg_free(NEM_msg_t *this)
 {
