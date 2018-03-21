@@ -16,7 +16,7 @@ extern NEM_rootd_svcmgr_t NEM_rootd_svc_daemon;
 static NEM_err_t routerd_start(NEM_app_t *app);
 
 static void
-routerd_restart_cb(NEM_thunk1_t *thunk, void *varg)
+routerd_restart(NEM_thunk1_t *thunk, void *varg)
 {
 	if (!want_running) {
 		printf("c-routerd: nevermind, leave it dead\n");
@@ -38,16 +38,18 @@ routerd_restart_cb(NEM_thunk1_t *thunk, void *varg)
 		}
 
 		NEM_app_after(app, 1000, NEM_thunk1_new_ptr(
-			&routerd_restart_cb,
+			&routerd_restart,
 			app
 		));
 	}
 }
 
 static void
-routerd_restart(NEM_thunk1_t *thunk, void *varg)
+on_child_died(NEM_thunk1_t *thunk, void *varg)
 {
 	is_running = false;
+	NEM_rootd_txnmgr_free(&txnmgr);
+	NEM_child_free(&child);
 
 	if (!want_running) {
 		if (NEM_rootd_verbose()) {
@@ -62,7 +64,7 @@ routerd_restart(NEM_thunk1_t *thunk, void *varg)
 
 	NEM_app_t *app = NEM_thunk1_ptr(thunk);
 	NEM_app_after(app, 10, NEM_thunk1_new_ptr(
-		&routerd_restart_cb,
+		&routerd_restart,
 		app
 	));
 }
@@ -116,7 +118,7 @@ routerd_start(NEM_app_t *app)
 	err = NEM_child_on_close(
 		&child,
 		NEM_thunk1_new_ptr(
-			&routerd_restart,
+			&on_child_died,
 			app
 		)
 	);
@@ -156,6 +158,10 @@ try_shutdown()
 {
 	printf("c-routerd: try-shutdown\n");
 	want_running = false;
+
+	// XXX: Be more graceful here.
+	NEM_child_stop(&child);
+
 	return true;
 }
 
@@ -167,8 +173,7 @@ teardown()
 		if (NEM_rootd_verbose()) {
 			printf("c-routerd: killing child\n");
 		}
-		NEM_rootd_txnmgr_free(&txnmgr);
-		NEM_child_free(&child);
+		NEM_child_stop(&child);
 		is_running = false;
 	}
 

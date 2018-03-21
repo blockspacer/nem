@@ -32,6 +32,9 @@ NEM_err_t NEM_child_init(
 	NEM_thunk1_t *preexec
 );
 
+// NEM_child_stop kills the child.
+void NEM_child_stop(NEM_child_t *this);
+
 // NEM_child_free kills the child if it's running and frees all resources.
 void NEM_child_free(NEM_child_t *this);
 

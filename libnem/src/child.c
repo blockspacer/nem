@@ -96,15 +96,23 @@ NEM_child_on_close(NEM_child_t *this, NEM_thunk1_t *thunk)
 }
 
 void
+NEM_child_stop(NEM_child_t *this)
+{
+	if (CHILD_STOPPED != this->state) {
+		kill(this->pid, SIGKILL);
+	}
+}
+
+void
 NEM_child_free(NEM_child_t *this)
 {
+	// NB: Squelsh the event that'll be generated when we kill the
+	// child, since we won't be around to handle it anymore.
 	struct kevent kev;
 	EV_SET(&kev, this->pid, EVFILT_PROC, EV_DELETE, NOTE_EXIT, 0, 0);
 	kevent(this->kq, &kev, 1, NULL, 0, NULL);
 
-	if (CHILD_STOPPED != this->state) {
-		kill(this->pid, SIGKILL);
-	}
+	NEM_child_stop(this);
 
 	NEM_fd_free(&this->fd);
 	NEM_chan_free(&this->chan);
