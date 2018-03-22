@@ -100,7 +100,7 @@ NEM_chan_read(NEM_chan_t *this)
 			}
 
 			this->rstate = NEM_CHAN_STATE_FD;
-			this->rmsg = NEM_msg_alloc(
+			this->rmsg = NEM_msg_new(
 				this->pmsg.header_len,
 				this->pmsg.body_len
 			);

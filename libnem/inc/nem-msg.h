@@ -70,16 +70,16 @@ static const uint8_t
 	NEM_MSGFLAG_BODY_INLINE   = 1 << 1, // body is inlined.
 	NEM_MSGFLAG_HAS_FD        = 1 << 2; // fd is set.
 
-// NEM_msg_alloc allocates a new NEM_msg_t. If header_len/body_len are
+// NEM_msg_new allocates a new NEM_msg_t. If header_len/body_len are
 // provided, the header/body fields are pre-allocated with a single
 // allocation. They can be 0; the caller must allocate them manually
 // and attach with NEM_msg_set_{header,body}.
 //
 // If {header,body}_len exceed maximums, NULL is returned.
-NEM_msg_t* NEM_msg_alloc(size_t header_len, size_t body_len);
-NEM_msg_t* NEM_msg_alloc_reply(NEM_msg_t *msg, size_t hlen, size_t blen);
+NEM_msg_t* NEM_msg_new(size_t header_len, size_t body_len);
+NEM_msg_t* NEM_msg_new_reply(NEM_msg_t *msg, size_t hlen, size_t blen);
 
-// NEM_msg_free frees a message allocated with NEM_msg_alloc.
+// NEM_msg_free frees a message allocated with NEM_msg_new.
 void NEM_msg_free(NEM_msg_t *this);
 
 // NEM_msg_set_fd attaches a file descriptor to the message.

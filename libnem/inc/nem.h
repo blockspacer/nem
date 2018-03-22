@@ -29,6 +29,7 @@
 #include "nem-fd.h"
 #include "nem-list.h"
 #include "nem-dial.h"
+#include "nem-msghdr.h"
 #include "nem-msg.h"
 #include "nem-chan.h"
 #include "nem-app.h"

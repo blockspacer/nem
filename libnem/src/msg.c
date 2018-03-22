@@ -20,7 +20,7 @@ NEM_pmsg_validate(const NEM_pmsg_t *this)
 }
 
 NEM_msg_t*
-NEM_msg_alloc(size_t header_len, size_t body_len)
+NEM_msg_new(size_t header_len, size_t body_len)
 {
 	if (header_len > NEM_PMSG_HDRMAX) {
 		return NULL;
@@ -47,9 +47,9 @@ NEM_msg_alloc(size_t header_len, size_t body_len)
 }
 
 NEM_msg_t*
-NEM_msg_alloc_reply(NEM_msg_t *msg, size_t hlen, size_t blen)
+NEM_msg_new_reply(NEM_msg_t *msg, size_t hlen, size_t blen)
 {
-	NEM_msg_t *this = NEM_msg_alloc(hlen, blen);
+	NEM_msg_t *this = NEM_msg_new(hlen, blen);
 	this->packed.flags |= NEM_PMSGFLAG_REPLY;
 	this->packed.seq = msg->packed.seq;
 	this->packed.service_id = msg->packed.service_id;
