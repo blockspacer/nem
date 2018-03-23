@@ -186,7 +186,7 @@ try_shutdown()
 	if (is_running && !shutdown_sent) {
 		shutdown_sent = true;
 
-		NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+		NEM_msg_t *msg = NEM_msg_new(0, 0);
 		msg->packed.service_id = NEM_svcid_daemon;
 		msg->packed.command_id = NEM_cmdid_daemon_stop;
 		NEM_rootd_txnmgr_req1(

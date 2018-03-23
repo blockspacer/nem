@@ -25,7 +25,7 @@ END_TEST
 
 START_TEST(dispatch_empty)
 {
-	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
 	msg->packed.service_id = 1;
 	msg->packed.command_id = 2;
 
@@ -56,7 +56,7 @@ START_TEST(dispatch_self)
 {
 	int val = 0;
 
-	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
 	msg->packed.service_id = 1;
 	msg->packed.command_id = 2;
 	msg->packed.seq = 1;
@@ -81,7 +81,7 @@ START_TEST(dispatch_child)
 {
 	int val = 0;
 
-	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
 	msg->packed.service_id = 1;
 	msg->packed.command_id = 2;
 	msg->packed.seq = 10;
@@ -123,7 +123,7 @@ START_TEST(dispatch_data)
 {
 	int val = 1;
 
-	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
 	msg->packed.service_id = 1;
 	msg->packed.command_id = 1;
 	msg->packed.seq = 10;

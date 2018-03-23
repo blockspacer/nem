@@ -2,7 +2,7 @@
 
 cd `dirname $0`
 
-CC=clang37
+CC=clang50
 SOURCE_FILES=src/*.c
 OBJ_FILES=
 OBJ_MAIN=

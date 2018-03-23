@@ -99,7 +99,7 @@ roundtrip_txn_srv(NEM_thunk_t *thunk, void *varg)
 	ck_assert_ptr_ne(NULL, ca->chan);
 	ck_assert_ptr_ne(NULL, ca->msg);
 
-	NEM_msg_t *msg = NEM_msg_alloc_reply(ca->msg, 0, 6);
+	NEM_msg_t *msg = NEM_msg_new_reply(ca->msg, 0, 6);
 	snprintf(msg->body, 6, "hello");
 	NEM_chan_send(ca->chan, msg);
 }
@@ -118,7 +118,7 @@ START_TEST(roundtrip_txn)
 
 	NEM_rootd_txnmgr_req1(
 		&mgr,
-		NEM_msg_alloc(0, 0),
+		NEM_msg_new(0, 0),
 		NEM_thunk1_new_ptr(&roundtrip_txn_cb, &work)
 	);
 

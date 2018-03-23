@@ -40,7 +40,7 @@ NEM_rootd_txnmgr_shutdown(NEM_rootd_txnmgr_t *this, NEM_err_t err)
 static void
 NEM_rootd_cancel_incoming(NEM_rootd_txnmgr_t *this, NEM_msg_t *inc)
 {
-	NEM_msg_t *cancel = NEM_msg_alloc_reply(inc, 0, 0);
+	NEM_msg_t *cancel = NEM_msg_new_reply(inc, 0, 0);
 	cancel->packed.flags |= NEM_PMSGFLAG_CANCEL;
 	// XXX: Might need to put NEM_PMSGFLAG_ROUTE in here if it's in the
 	// incoming request, not sure how those semantics are going to work yet.
