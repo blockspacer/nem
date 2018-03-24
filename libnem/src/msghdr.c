@@ -1,53 +1,60 @@
 #include "nem.h"
 #include <bson.h>
 
-typedef struct {
-	char *buf;
-	size_t off_err;
-	size_t off_route;
+typedef struct NEM_msghdr_buf_t NEM_msghdr_buf_t;
+struct NEM_msghdr_buf_t {
+	size_t            len;
+	size_t            cap;
+	NEM_msghdr_buf_t *prev;
+	NEM_ALIGN char    data[];
+};
 
-	size_t len;
-	size_t cap;
+typedef struct {
+	NEM_msghdr_t *hdr;
+	NEM_msghdr_buf_t *head;
 }
 NEM_msghdr_work_t;
 
-static void*
-NEM_msghdr_work_alloc(NEM_msghdr_work_t *work, size_t len)
+static NEM_msghdr_buf_t*
+NEM_msghdr_buf_new(size_t cap)
 {
-	// NB: This is a dirty goddamn hack but make sure all of the allocations
-	// are word-aligned.
+	size_t new_buf_len = sizeof(NEM_msghdr_buf_t) + cap;
+	NEM_msghdr_buf_t *new_buf = NEM_malloc(new_buf_len);
+	new_buf->cap = cap;
+	return new_buf;
+}
+
+static void*
+NEM_msghdr_buf_alloc(NEM_msghdr_buf_t **buf, size_t len)
+{
+	// NB: Dirty, but allocations should be 8-byte aligned. Pad each
+	// allocation out to meet that requirement.
 	if (0 != len % 8) {
 		len += 8 - (len % 8);
 	}
 
-	if (len + work->len > work->cap) {
-		// XXX: This is 100% fucked holy shit why.
-		NEM_panic("ENOMEM FUUUU");
+	if (len + (*buf)->len > (*buf)->cap) {
+		// Need to allocate a new buffer.
+		size_t new_cap = (*buf)->cap * 2;
+		if (new_cap < len) {
+			new_cap = len;
+		}
+
+		NEM_msghdr_buf_t *new_buf = NEM_msghdr_buf_new(new_cap);
+		new_buf->prev = *buf;
+		*buf = new_buf;
 	}
 
-	void *ret = &work->buf[work->len];
-	work->len += len;
-	return ret;
+	char *ptr = &(*buf)->data[(*buf)->len];
+	(*buf)->len += len;
+	return ptr;
 }
 
-#define DEF_GET_METHOD(field) \
-	static NEM_msghdr_##field##_t* \
-	NEM_msghdr_work_##field(NEM_msghdr_work_t *work) \
-	{ \
-		if (0 != work->off_##field) { \
-			return (NEM_msghdr_##field##_t*) &work->buf[work->off_##field]; \
-		} \
-		char *ptr = NEM_msghdr_work_alloc(work, sizeof(NEM_msghdr_##field##_t)); \
-		if (NULL == ptr) { \
-			return NULL; \
-		} \
-		work->off_##field = ptr - work->buf; \
-		return (NEM_msghdr_##field##_t*) ptr; \
-	}
-
-DEF_GET_METHOD(err);
-DEF_GET_METHOD(route);
-#undef DEF_GET_METHOD
+static void*
+NEM_msghdr_work_alloc(NEM_msghdr_work_t *this, size_t len)
+{
+	return NEM_msghdr_buf_alloc(&this->head, len);
+}
 
 static int64_t
 read_int64(NEM_msghdr_work_t *work, bson_iter_t *iter)
@@ -79,20 +86,23 @@ read_string(NEM_msghdr_work_t *work, bson_iter_t *iter)
 NEM_err_t
 NEM_msghdr_unmarshal_err(NEM_msghdr_work_t *work, bson_iter_t *iter)
 {
-	NEM_msghdr_err_t hdr = {0};
+	NEM_msghdr_err_t *hdr = NEM_msghdr_work_alloc(
+		work,
+		sizeof(NEM_msghdr_err_t)
+	);
+	work->hdr->err = hdr;
 
 	while (bson_iter_next(iter)) {
 		const char *key = bson_iter_key(iter);
 
 		if (!strcmp(key, "code")) {
-			hdr.code = read_int64(work, iter);
+			hdr->code = read_int64(work, iter);
 		}
 		else if (!strcmp(key, "reason")) {
-			hdr.reason = read_string(work, iter);
+			hdr->reason = read_string(work, iter);
 		}
 	}
 
-	*NEM_msghdr_work_err(work) = hdr;
 	return NEM_err_none;
 }
 
@@ -110,26 +120,29 @@ NEM_msghdr_marshal_err(NEM_msghdr_err_t *hdr, bson_t *doc)
 NEM_err_t
 NEM_msghdr_unmarshal_route(NEM_msghdr_work_t *work, bson_iter_t *iter)
 {
-	NEM_msghdr_route_t hdr = {0};
+	NEM_msghdr_route_t *hdr = NEM_msghdr_work_alloc(
+		work,
+		sizeof(NEM_msghdr_route_t)
+	);
+	work->hdr->route = hdr;
 
 	while (bson_iter_next(iter)) {
 		const char *key = bson_iter_key(iter);
 
 		if (!strcmp(key, "cluster")) {
-			hdr.cluster = read_string(work, iter);
+			hdr->cluster = read_string(work, iter);
 		}
 		else if (!strcmp(key, "host")) {
-			hdr.host = read_string(work, iter);
+			hdr->host = read_string(work, iter);
 		}
 		else if (!strcmp(key, "inst")) {
-			hdr.inst = read_string(work, iter);
+			hdr->inst = read_string(work, iter);
 		}
 		else if (!strcmp(key, "obj")) {
-			hdr.obj = read_string(work, iter);
+			hdr->obj = read_string(work, iter);
 		}
 	}
 
-	*NEM_msghdr_work_route(work) = hdr;
 	return NEM_err_none;
 }
 
@@ -220,7 +233,7 @@ NEM_msghdr_marshal(NEM_msghdr_t *hdr, bson_t *doc)
 }
 
 NEM_err_t
-NEM_msghdr_new(NEM_msghdr_t **hdr, const void *bs, size_t len)
+NEM_msghdr_new(NEM_msghdr_t **out, const void *bs, size_t len)
 {
 	bson_t doc;
 
@@ -232,25 +245,20 @@ NEM_msghdr_new(NEM_msghdr_t **hdr, const void *bs, size_t len)
 	char *json = bson_as_canonical_extended_json(&doc, &json_len);
 	free(json);
 
-	NEM_msghdr_work_t work = {0};
-	work.len = sizeof(NEM_msghdr_t);
-	// XXX: This is fucked, we're only doing a single allocation
-	// because goddamn pointer fixups are the worst fucking thing
-	// in the entire goddamn world.
-	work.cap = sizeof(NEM_msghdr_t) + 2 * len;
-   	work.buf = NEM_malloc(work.cap);
+	NEM_msghdr_t *hdr = NEM_malloc(
+		sizeof(NEM_msghdr_t) + sizeof(NEM_msghdr_work_t)
+	);
+	NEM_msghdr_work_t *work = (NEM_msghdr_work_t*) &hdr->data;
+	work->hdr = hdr;
+	work->head = NEM_msghdr_buf_new(512);
 
-	NEM_err_t err = NEM_msghdr_unmarshal(&work, &doc);
+	NEM_err_t err = NEM_msghdr_unmarshal(work, &doc);
 	bson_destroy(&doc);
-	if (NEM_err_ok(err)) {
-		*hdr = (NEM_msghdr_t*) work.buf;
-
-		if (0 != work.off_err) {
-			(*hdr)->err = (void*) &work.buf[work.off_err];
-		}
-		if (0 != work.off_route) {
-			(*hdr)->route = (void*) &work.buf[work.off_route];
-		}
+	if (!NEM_err_ok(err)) {
+		NEM_msghdr_free(hdr);
+	}
+	else {
+		*out = hdr;
 	}
 
 	return err;
@@ -259,8 +267,13 @@ NEM_msghdr_new(NEM_msghdr_t **hdr, const void *bs, size_t len)
 void
 NEM_msghdr_free(NEM_msghdr_t *hdr)
 {
-	// XXX: Might want to check that this is actually allocated with
-	// NEM_msghdr_new rather than a to-be-packed stack allocation.
+	NEM_msghdr_work_t *work = (NEM_msghdr_work_t*) &hdr->data[0];
+	while (NULL != work->head) {
+		NEM_msghdr_buf_t *next = work->head->prev;
+		free(work->head);
+		work->head = next;
+	}
+
 	free(hdr);
 }
 
