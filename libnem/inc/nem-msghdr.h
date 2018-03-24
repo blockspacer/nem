@@ -17,7 +17,7 @@ NEM_msghdr_route_t;
 typedef struct {
 	NEM_msghdr_err_t   *err;
 	NEM_msghdr_route_t *route;
-	char data[];
+	NEM_ALIGN char data[];
 }
 NEM_msghdr_t;
 

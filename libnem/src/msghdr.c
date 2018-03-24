@@ -14,14 +14,15 @@ NEM_msghdr_work_t;
 static void*
 NEM_msghdr_work_alloc(NEM_msghdr_work_t *work, size_t len)
 {
-	if (len > work->len + work->cap) {
-		work->cap = work->cap + len;
-		work->buf = NEM_panic_if_null(realloc(work->buf, work->cap));
+	// NB: This is a dirty goddamn hack but make sure all of the allocations
+	// are word-aligned.
+	if (0 != len % 8) {
+		len += 8 - (len % 8);
 	}
-	if (len > work->len + work->cap) {
-		// :vomit:
-		NEM_panic("XXX: change this if the alloc strategy changes");
-		//return NULL;
+
+	if (len + work->len > work->cap) {
+		// XXX: This is 100% fucked holy shit why.
+		NEM_panic("ENOMEM FUUUU");
 	}
 
 	void *ret = &work->buf[work->len];
@@ -96,6 +97,17 @@ NEM_msghdr_unmarshal_err(NEM_msghdr_work_t *work, bson_iter_t *iter)
 }
 
 NEM_err_t
+NEM_msghdr_marshal_err(NEM_msghdr_err_t *hdr, bson_t *doc)
+{
+	BSON_APPEND_INT64(doc, "code", hdr->code);
+	if (NULL != hdr->reason) {
+		BSON_APPEND_UTF8(doc, "reason", hdr->reason);
+	}
+
+	return NEM_err_none;
+}
+
+NEM_err_t
 NEM_msghdr_unmarshal_route(NEM_msghdr_work_t *work, bson_iter_t *iter)
 {
 	NEM_msghdr_route_t hdr = {0};
@@ -118,6 +130,25 @@ NEM_msghdr_unmarshal_route(NEM_msghdr_work_t *work, bson_iter_t *iter)
 	}
 
 	*NEM_msghdr_work_route(work) = hdr;
+	return NEM_err_none;
+}
+
+NEM_err_t
+NEM_msghdr_marshal_route(NEM_msghdr_route_t *hdr, bson_t *doc)
+{
+	if (NULL != hdr->cluster) {
+		BSON_APPEND_UTF8(doc, "cluster", hdr->cluster);
+	}
+	if (NULL != hdr->host) {
+		BSON_APPEND_UTF8(doc, "host", hdr->host);
+	}
+	if (NULL != hdr->inst) {
+		BSON_APPEND_UTF8(doc, "inst", hdr->inst);
+	}
+	if (NULL != hdr->obj) {
+		BSON_APPEND_UTF8(doc, "obj", hdr->obj);
+	}
+
 	return NEM_err_none;
 }
 
@@ -169,7 +200,27 @@ NEM_msghdr_unmarshal(NEM_msghdr_work_t *work, bson_t *doc)
 }
 
 NEM_err_t
-NEM_msghdr_alloc(NEM_msghdr_t **hdr, const void *bs, size_t len)
+NEM_msghdr_marshal(NEM_msghdr_t *hdr, bson_t *doc)
+{
+	NEM_err_t err = NEM_err_none;
+	bson_t child;
+
+	if (NEM_err_ok(err) && NULL != hdr->err) {
+		BSON_APPEND_DOCUMENT_BEGIN(doc, "err", &child);
+		err = NEM_msghdr_marshal_err(hdr->err, &child);
+		bson_append_document_end(doc, &child);
+	}
+	if (NEM_err_ok(err) && NULL != hdr->route) {
+		BSON_APPEND_DOCUMENT_BEGIN(doc, "route", &child);
+		err = NEM_msghdr_marshal_route(hdr->route, &child);
+		bson_append_document_end(doc, &child);
+	}
+
+	return err;
+}
+
+NEM_err_t
+NEM_msghdr_new(NEM_msghdr_t **hdr, const void *bs, size_t len)
 {
 	bson_t doc;
 
@@ -177,12 +228,61 @@ NEM_msghdr_alloc(NEM_msghdr_t **hdr, const void *bs, size_t len)
 		return NEM_err_static("NEM_msghdr_alloc: invalid bson");
 	}
 
-	NEM_msghdr_work_t work;
+	size_t json_len;
+	char *json = bson_as_canonical_extended_json(&doc, &json_len);
+	free(json);
+
+	NEM_msghdr_work_t work = {0};
 	work.len = sizeof(NEM_msghdr_t);
-	work.cap = sizeof(NEM_msghdr_t);// + len;
+	// XXX: This is fucked, we're only doing a single allocation
+	// because goddamn pointer fixups are the worst fucking thing
+	// in the entire goddamn world.
+	work.cap = sizeof(NEM_msghdr_t) + 2 * len;
    	work.buf = NEM_malloc(work.cap);
 
 	NEM_err_t err = NEM_msghdr_unmarshal(&work, &doc);
 	bson_destroy(&doc);
+	if (NEM_err_ok(err)) {
+		*hdr = (NEM_msghdr_t*) work.buf;
+
+		if (0 != work.off_err) {
+			(*hdr)->err = (void*) &work.buf[work.off_err];
+		}
+		if (0 != work.off_route) {
+			(*hdr)->route = (void*) &work.buf[work.off_route];
+		}
+	}
+
 	return err;
+}
+
+void
+NEM_msghdr_free(NEM_msghdr_t *hdr)
+{
+	// XXX: Might want to check that this is actually allocated with
+	// NEM_msghdr_new rather than a to-be-packed stack allocation.
+	free(hdr);
+}
+
+NEM_err_t
+NEM_msghdr_pack(NEM_msghdr_t *hdr, void **out, size_t *outlen)
+{
+	bson_t doc;
+	bson_init(&doc);
+
+	NEM_err_t err = NEM_msghdr_marshal(hdr, &doc);
+	if (!NEM_err_ok(err)) {
+		bson_destroy(&doc);
+		return err;
+	}
+
+	uint32_t len;
+	uint8_t *bs = bson_destroy_with_steal(&doc, true, &len);
+	if (NULL == bs) {
+		return NEM_err_static("NEM_msghdr_pack: bson_destroy_with steal failed");
+	}
+
+	*out = bs;
+	*outlen = (size_t) len;
+	return NEM_err_none;
 }

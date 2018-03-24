@@ -4,6 +4,7 @@ typedef Suite*(*suite_def)();
 
 extern Suite 
 	*suite_thunk(),
+	*suite_msghdr(),
 	*suite_msg(),
 	*suite_app(),
 	*suite_fd(),
@@ -14,6 +15,7 @@ extern Suite
 
 static suite_def suites[] = {
 	&suite_thunk,
+	&suite_msghdr,
 	&suite_msg,
 	&suite_app,
 	&suite_fd,
