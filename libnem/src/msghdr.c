@@ -75,6 +75,9 @@ read_string(NEM_msghdr_work_t *work, bson_iter_t *iter)
 
 	uint32_t len;
 	const char *val = bson_iter_utf8(iter, &len);
+	if (0 == len) {
+		return NULL;
+	}
 
 	char *outval = NEM_msghdr_work_alloc(work, len + 1);
 	memcpy(outval, val, len);

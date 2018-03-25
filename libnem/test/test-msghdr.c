@@ -74,13 +74,40 @@ START_TEST(roundtrip_route)
 }
 END_TEST
 
+START_TEST(empty_string_null)
+{
+	NEM_msghdr_err_t hdr_err = {
+		.code = 42,
+		.reason = "",
+	};
+	NEM_msghdr_t hdr_in = {
+		.err = &hdr_err,
+	};
+	NEM_msghdr_t *hdr_out = NULL;
+	void *bs;
+	size_t len;
+
+	ck_err(NEM_msghdr_pack(&hdr_in, &bs, &len));
+	ck_err(NEM_msghdr_new(&hdr_out, bs, len));
+	free(bs);
+
+	ck_assert_ptr_ne(NULL, hdr_out);
+	ck_assert_ptr_ne(NULL, hdr_out->err);
+	ck_assert_int_eq(42, hdr_out->err->code);
+	ck_assert_ptr_eq(NULL, hdr_out->err->reason);
+	ck_assert_ptr_eq(NULL, hdr_out->route);
+	NEM_msghdr_free(hdr_out);
+}
+END_TEST
+
 Suite*
 suite_msghdr()
 {
 	tcase_t tests[] = {
-		{ "roundtrip_empty", &roundtrip_empty },
-		{ "roundtrip_err",   &roundtrip_err   },
-		{ "roundtrip_route", &roundtrip_route },
+		{ "roundtrip_empty",   &roundtrip_empty   },
+		{ "roundtrip_err",     &roundtrip_err     },
+		{ "roundtrip_route",   &roundtrip_route   },
+		{ "empty_string_null", &empty_string_null },
 	};
 
 	return tcase_build_suite("msghdr", tests, sizeof(tests));
