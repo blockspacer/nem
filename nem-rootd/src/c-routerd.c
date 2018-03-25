@@ -3,15 +3,18 @@
 #include "lifecycle.h"
 #include "c_routerd.h"
 #include "txnmgr.h"
-#include "svcdef.h"
+#include "svclist.h"
 
-static NEM_child_t        child;
-static NEM_rootd_txnmgr_t txnmgr;
-static bool               is_running = false;
-static bool               want_running = true;
-static bool               shutdown_sent = false;
+static NEM_child_t         child;
+static NEM_rootd_txnmgr_t  txnmgr;
+static NEM_rootd_svclist_t svcs;
+static bool                is_running = false;
+static bool                want_running = true;
+static bool                shutdown_sent = false;
 
-extern NEM_rootd_svcdef_t NEM_rootd_svc_daemon;
+extern NEM_rootd_svcdef_t
+	NEM_rootd_svc_daemon,
+	NEM_rootd_svc_host;
 
 static NEM_err_t routerd_start(NEM_app_t *app);
 
@@ -77,11 +80,7 @@ static void
 routerd_dispatch(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_chan_ca *ca = varg;
-	bool handled = NEM_rootd_svcdef_dispatch(
-		&NEM_rootd_svc_daemon,
-		ca->msg,
-		ca->chan
-	);
+	bool handled = NEM_rootd_svclist_dispatch(&svcs, ca->msg, ca->chan);
 
 	if (!handled) {
 		if (NEM_rootd_verbose()) {
@@ -155,6 +154,10 @@ setup(NEM_app_t *app)
 		printf("c-routerd: setup\n");
 	}
 
+	NEM_rootd_svclist_init(&svcs);
+	NEM_rootd_svclist_add(&svcs, &NEM_rootd_svc_daemon);
+	NEM_rootd_svclist_add(&svcs, &NEM_rootd_svc_host);
+
 	return routerd_start(app);
 }
 
@@ -212,6 +215,8 @@ teardown()
 		is_running = false;
 		NEM_child_free(&child);
 	}
+
+	NEM_rootd_svclist_free(&svcs);
 }
 
 const NEM_rootd_comp_t NEM_rootd_c_routerd = {
