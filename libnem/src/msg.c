@@ -83,7 +83,7 @@ NEM_msg_set_fd(NEM_msg_t *this, int fd)
 }
 
 NEM_err_t
-NEM_msg_set_header(NEM_msg_t *this, void *header, size_t len)
+NEM_msg_set_header_raw(NEM_msg_t *this, void *header, size_t len)
 {
 	if (len > NEM_PMSG_HDRMAX) {
 		return NEM_err_static("NEM_msg_set_header: too long");
@@ -97,6 +97,24 @@ NEM_msg_set_header(NEM_msg_t *this, void *header, size_t len)
 	this->header = header;
 	this->packed.header_len = (uint16_t) len;
 	return NEM_err_none;
+}
+
+NEM_err_t
+NEM_msg_set_header(NEM_msg_t *this, NEM_msghdr_t *hdr)
+{
+	void *bs;
+	size_t len;
+	NEM_err_t err = NEM_msghdr_pack(hdr, &bs, &len);
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
+
+	err = NEM_msg_set_header_raw(this, bs, len);
+	if (!NEM_err_ok(err)) {
+		free(bs);
+	}
+
+	return err;
 }
 
 NEM_err_t

@@ -85,10 +85,17 @@ void NEM_msg_free(NEM_msg_t *this);
 // NEM_msg_set_fd attaches a file descriptor to the message.
 NEM_err_t NEM_msg_set_fd(NEM_msg_t *this, int fd);
 
-// NEM_msg_set_header attaches a header buffer to the message. The buffer
+// NEM_msg_set_header_raw attaches a header buffer to the message. The buffer
 // becomes owned by the message and will be freed with NEM_msg_free (or
 // when a different buffer is attached).
-NEM_err_t NEM_msg_set_header(NEM_msg_t *this, void *header, size_t len);
+// 
+// Headers should be encoded with BSON for compat, use NEM_msg_set_header
+// instead which handles the serialization directly.
+NEM_err_t NEM_msg_set_header_raw(NEM_msg_t *this, void *header, size_t len);
+
+// NEM_msg_set_header serializes the passed NEM_msghdr_t and attaches
+// it to the message.
+NEM_err_t NEM_msg_set_header(NEM_msg_t *this, NEM_msghdr_t *hdr);
 
 // NEM_msg_set_body does the same thing as NEM_msg_set_header, but with
 // a different field.

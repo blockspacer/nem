@@ -98,8 +98,17 @@ routerd_dispatch(NEM_thunk_t *thunk, void *varg)
 			);
 		}
 
-		// XXX: Send an error reply here. We're not equipped to send errors
-		// currently since the headers and stuff aren't set up yet.
+		// XXX: This should probably be lifted somewhere common.
+		NEM_msghdr_err_t err = {
+			.code   = 1,
+			.reason = "unknown command",
+		};
+		NEM_msghdr_t hdr = {
+			.err = &err,
+		};
+		NEM_msg_t *reply = NEM_msg_new_reply(ca->msg, 0, 0);
+		NEM_msg_set_header(reply, &hdr);
+		NEM_chan_send(ca->chan, reply);
 	}
 }
 

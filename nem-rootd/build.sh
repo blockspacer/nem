@@ -16,6 +16,7 @@ LIBS="
 	-lcxxrt
 	-lz
 	-lgeom
+	-lbson-1.0
 	/home/lye/code/libtoml2/bin/libtoml2.a
 "
 

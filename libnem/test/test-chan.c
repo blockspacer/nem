@@ -154,7 +154,7 @@ START_TEST(send_hdr)
 	));
 
 	NEM_msg_t *msg = NEM_msg_new(0, 0);
-	ck_err(NEM_msg_set_header(msg, strdup("hello"), 6));
+	ck_err(NEM_msg_set_header_raw(msg, strdup("hello"), 6));
 	NEM_chan_send(&work.c_2, msg);
 
 	ck_err(NEM_app_run(&work.app));
@@ -297,7 +297,7 @@ START_TEST(send_hdrbody_ibody)
 	));
 
 	NEM_msg_t *msg = NEM_msg_new(0, 6);
-	ck_err(NEM_msg_set_header(msg, strdup("hello"), 6));
+	ck_err(NEM_msg_set_header_raw(msg, strdup("hello"), 6));
 	memcpy(msg->body, "world", 6);
 	NEM_chan_send(&work.c_2, msg);
 
@@ -319,7 +319,7 @@ START_TEST(send_hdrbody)
 	));
 
 	NEM_msg_t *msg = NEM_msg_new(0, 0);
-	ck_err(NEM_msg_set_header(msg, strdup("hello"), 6));
+	ck_err(NEM_msg_set_header_raw(msg, strdup("hello"), 6));
 	ck_err(NEM_msg_set_body(msg, strdup("world"), 6));
 	NEM_chan_send(&work.c_2, msg);
 
@@ -401,7 +401,7 @@ START_TEST(send_fd_hdr)
 
 	NEM_msg_t *msg = NEM_msg_new(0, 0);
 	ck_err(NEM_msg_set_fd(msg, STDOUT_FILENO));
-	ck_err(NEM_msg_set_header(msg, strdup("hello"), 6));
+	ck_err(NEM_msg_set_header_raw(msg, strdup("hello"), 6));
 	NEM_chan_send(&work.c_2, msg);
 
 	ck_err(NEM_app_run(&work.app));
