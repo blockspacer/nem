@@ -13,11 +13,10 @@ svc_daemon_info(NEM_thunk_t *thunk, void *varg)
 	}
 
 	NEM_rootd_cmd_ca *ca = varg;
-	NEM_chan_t *chan = ca->data;
 
 	NEM_msg_t *msg = NEM_msg_new_reply(ca->msg, 0, 6);
 	snprintf(msg->body, 6, "hello");
-	NEM_chan_send(chan, msg);
+	NEM_chan_send(ca->chan, msg);
 }
 
 static void

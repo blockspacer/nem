@@ -80,7 +80,7 @@ dispatch_data_cb(NEM_thunk_t *thunk, void *varg)
 	int *val = NEM_thunk_ptr(thunk);
 	*val = 10;
 
-	int *data = (int*) ca->data;
+	int *data = (int*) ca->chan;
 	ck_assert_int_eq(42, *data);
 }
 
@@ -101,7 +101,7 @@ START_TEST(dispatch_data)
 
 	int val2 = 42;
 
-	ck_assert(!NEM_rootd_svcdef_dispatch(&def, msg, &val2));
+	ck_assert(!NEM_rootd_svcdef_dispatch(&def, msg, (NEM_chan_t*) &val2));
 	ck_assert_int_eq(10, val);
 
 	NEM_rootd_svcdef_free(&def);

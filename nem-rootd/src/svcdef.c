@@ -40,8 +40,11 @@ NEM_rootd_svcdef_on_unmatched(NEM_rootd_svcdef_t *this, NEM_thunk_t *cb)
 }
 
 bool
-NEM_rootd_svcdef_dispatch(NEM_rootd_svcdef_t *this, NEM_msg_t *msg, void *data)
-{
+NEM_rootd_svcdef_dispatch(
+	NEM_rootd_svcdef_t *this,
+	NEM_msg_t          *msg,
+	NEM_chan_t         *chan
+) {
 	NEM_rootd_cmd_t dummy = {
 		.svc_id = msg->packed.service_id,
 		.cmd_id = msg->packed.command_id,
@@ -53,7 +56,7 @@ NEM_rootd_svcdef_dispatch(NEM_rootd_svcdef_t *this, NEM_msg_t *msg, void *data)
 	NEM_rootd_cmd_ca ca = {
 		.msg     = msg,
 		.handled = &ret,
-		.data    = data,
+		.chan    = chan,
 	};
 
 	if (NULL != cmd) {

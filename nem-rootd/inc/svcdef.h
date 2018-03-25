@@ -35,9 +35,9 @@ RB_PROTOTYPE(
 // NEM_rootd_msg_ca is the callback arg passed out from NEM_rootd_svcdef_t
 // to things waiting for messages.
 typedef struct {
-	NEM_msg_t *msg;
-	bool      *handled;
-	void      *data;
+	NEM_msg_t  *msg;
+	bool       *handled;
+	NEM_chan_t *chan;
 }
 NEM_rootd_cmd_ca;
 
@@ -68,7 +68,7 @@ void NEM_rootd_svcdef_on_unmatched(NEM_rootd_svcdef_t *this, NEM_thunk_t *cb);
 bool NEM_rootd_svcdef_dispatch(
 	NEM_rootd_svcdef_t *this,
 	NEM_msg_t          *msg,
-	void               *data
+	NEM_chan_t         *chan
 );
 
 // NEM_rootd_svcdef_add registers a service/command/thunk tuple.
