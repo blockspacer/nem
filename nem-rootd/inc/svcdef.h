@@ -32,7 +32,7 @@ RB_PROTOTYPE(
 	NEM_rootd_cmd_cmp
 );
 
-// NEM_rootd_msg_ca is the callback arg passed out from NEM_rootd_svcmgr_t
+// NEM_rootd_msg_ca is the callback arg passed out from NEM_rootd_svcdef_t
 // to things waiting for messages.
 typedef struct {
 	NEM_msg_t *msg;
@@ -41,46 +41,39 @@ typedef struct {
 }
 NEM_rootd_cmd_ca;
 
-// NEM_rootd_svcmgr_t is a service dispatch manager. It keeps a handle on a
+// NEM_rootd_svcdef_t is a service dispatch manager. It keeps a handle on a
 // pile of registered services and lets you dispatch messages straight to
 // those service callbacks. It's hierarchical -- you can attach up to one
-// child to each NEM_rootd_svcmgr_t which receives the messages when there's
+// child to each NEM_rootd_svcdef_t which receives the messages when there's
 // no matching entry in the parent.
 typedef struct {
 	NEM_rootd_cmdtree_t tree;
 	NEM_thunk_t        *on_unmatched;
 }
-NEM_rootd_svcmgr_t;
+NEM_rootd_svcdef_t;
 
-void NEM_rootd_svcmgr_init(NEM_rootd_svcmgr_t *this);
-void NEM_rootd_svcmgr_free(NEM_rootd_svcmgr_t *this);
+void NEM_rootd_svcdef_init(NEM_rootd_svcdef_t *this);
+void NEM_rootd_svcdef_free(NEM_rootd_svcdef_t *this);
 
-// NEM_rootd_svcmgr_on_unmatched sets a thunk which is invoked with a
+// NEM_rootd_svcdef_on_unmatched sets a thunk which is invoked with a
 // NEM_rootd_cmd_ca whenever an incoming message isn't matched. The return
-// value of the corresponding NEM_rootd_svcmgr_dispatch can be set via the
+// value of the corresponding NEM_rootd_svcdef_dispatch can be set via the
 // ca->handled pointer.
-void NEM_rootd_svcmgr_on_unmatched(NEM_rootd_svcmgr_t *this, NEM_thunk_t *cb);
+void NEM_rootd_svcdef_on_unmatched(NEM_rootd_svcdef_t *this, NEM_thunk_t *cb);
 
-// NEM_rootd_svcmgr_set_next is shorthand for NEM_rootd_svcmgr_on_unmatched.
-// It automatically sets up the thunk and does stuff.
-void NEM_rootd_svcmgr_set_next(
-	NEM_rootd_svcmgr_t *this,
-	NEM_rootd_svcmgr_t *next
-);
-
-// NEM_rootd_svcmgr_dispatch dispatches a message. It returns true iff there
+// NEM_rootd_svcdef_dispatch dispatches a message. It returns true iff there
 // was a matching handler. The data is passed through I'm not sure what needs
 // to go there yet
 // XXX: Figure out what the fuck data needs to be and thread it through.
-bool NEM_rootd_svcmgr_dispatch(
-	NEM_rootd_svcmgr_t *this,
+bool NEM_rootd_svcdef_dispatch(
+	NEM_rootd_svcdef_t *this,
 	NEM_msg_t          *msg,
 	void               *data
 );
 
-// NEM_rootd_svcmgr_add registers a service/command/thunk tuple.
-NEM_err_t NEM_rootd_svcmgr_add(
-	NEM_rootd_svcmgr_t *this,
+// NEM_rootd_svcdef_add registers a service/command/thunk tuple.
+NEM_err_t NEM_rootd_svcdef_add(
+	NEM_rootd_svcdef_t *this,
 	uint16_t            svc_id,
 	uint16_t            cmd_id,
 	NEM_thunk_t        *cb

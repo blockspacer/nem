@@ -5,12 +5,12 @@ typedef Suite*(*suite_def)();
 extern Suite 
 	*suite_jd(),
 	*suite_txnmgr(),
-	*suite_svcmgr();
+	*suite_svcdef();
 
 static suite_def suites[] = {
 	&suite_jd,
 	&suite_txnmgr,
-	&suite_svcmgr,
+	&suite_svcdef,
 };
 
 int

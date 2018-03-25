@@ -1,9 +1,9 @@
 #include "nem.h"
-#include "svcmgr.h"
+#include "svcdef.h"
 #include "lifecycle.h"
 #include "state.h"
 
-NEM_rootd_svcmgr_t NEM_rootd_svc_daemon = {};
+NEM_rootd_svcdef_t NEM_rootd_svc_daemon = {};
 
 static void
 svc_daemon_info(NEM_thunk_t *thunk, void *varg)
@@ -62,10 +62,10 @@ setup(NEM_app_t *app)
 		{ NEM_cmdid_daemon_stop,   &svc_daemon_stop   },
 	};
 
-	NEM_rootd_svcmgr_init(&NEM_rootd_svc_daemon);
+	NEM_rootd_svcdef_init(&NEM_rootd_svc_daemon);
 
 	for (size_t i = 0; i < NEM_ARRSIZE(handlers); i += 1) {
-		NEM_err_t err = NEM_rootd_svcmgr_add(
+		NEM_err_t err = NEM_rootd_svcdef_add(
 			&NEM_rootd_svc_daemon,
 			NEM_svcid_daemon,
 			handlers[i].cmd_id,
@@ -86,7 +86,7 @@ teardown()
 		printf("c-svc-daemon: teardown\n");
 	}
 
-	NEM_rootd_svcmgr_free(&NEM_rootd_svc_daemon);
+	NEM_rootd_svcdef_free(&NEM_rootd_svc_daemon);
 }
 
 const NEM_rootd_comp_t NEM_rootd_c_svc_daemon = {

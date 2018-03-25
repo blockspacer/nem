@@ -1,4 +1,4 @@
-#include "svcmgr.h"
+#include "svcdef.h"
 
 RB_GENERATE(
 	NEM_rootd_cmdtree_t,
@@ -8,14 +8,14 @@ RB_GENERATE(
 );
 
 void
-NEM_rootd_svcmgr_init(NEM_rootd_svcmgr_t *this)
+NEM_rootd_svcdef_init(NEM_rootd_svcdef_t *this)
 {
 	bzero(this, sizeof(*this));
 	RB_INIT(&this->tree);
 }
 
 void
-NEM_rootd_svcmgr_free(NEM_rootd_svcmgr_t *this)
+NEM_rootd_svcdef_free(NEM_rootd_svcdef_t *this)
 {
 	NEM_rootd_cmd_t *cmd = NULL, *tmp = NULL;
 
@@ -31,7 +31,7 @@ NEM_rootd_svcmgr_free(NEM_rootd_svcmgr_t *this)
 }
 
 void
-NEM_rootd_svcmgr_on_unmatched(NEM_rootd_svcmgr_t *this, NEM_thunk_t *cb)
+NEM_rootd_svcdef_on_unmatched(NEM_rootd_svcdef_t *this, NEM_thunk_t *cb)
 {
 	if (NULL != this->on_unmatched) {
 		NEM_thunk_free(this->on_unmatched);
@@ -39,25 +39,8 @@ NEM_rootd_svcmgr_on_unmatched(NEM_rootd_svcmgr_t *this, NEM_thunk_t *cb)
 	this->on_unmatched = cb;
 }
 
-static void
-NEM_rootd_svcmgr_next_cb(NEM_thunk_t *thunk, void *varg)
-{
-	NEM_rootd_svcmgr_t *this = NEM_thunk_ptr(thunk);
-	NEM_rootd_cmd_ca *ca = varg;
-	*ca->handled = NEM_rootd_svcmgr_dispatch(this, ca->msg, ca->data);
-}
-
-void
-NEM_rootd_svcmgr_set_next(NEM_rootd_svcmgr_t *this, NEM_rootd_svcmgr_t *next)
-{
-	NEM_rootd_svcmgr_on_unmatched(this, NEM_thunk_new_ptr(
-		&NEM_rootd_svcmgr_next_cb,
-		next
-	));
-}
-
 bool
-NEM_rootd_svcmgr_dispatch(NEM_rootd_svcmgr_t *this, NEM_msg_t *msg, void *data)
+NEM_rootd_svcdef_dispatch(NEM_rootd_svcdef_t *this, NEM_msg_t *msg, void *data)
 {
 	NEM_rootd_cmd_t dummy = {
 		.svc_id = msg->packed.service_id,
@@ -87,8 +70,8 @@ NEM_rootd_svcmgr_dispatch(NEM_rootd_svcmgr_t *this, NEM_msg_t *msg, void *data)
 }
 
 NEM_err_t
-NEM_rootd_svcmgr_add(
-	NEM_rootd_svcmgr_t *this,
+NEM_rootd_svcdef_add(
+	NEM_rootd_svcdef_t *this,
 	uint16_t            svc_id,
 	uint16_t            cmd_id,
 	NEM_thunk_t        *cb
@@ -102,7 +85,7 @@ NEM_rootd_svcmgr_add(
 	if (NULL != old) {
 		free(cmd);
 		NEM_thunk_free(cb);
-		return NEM_err_static("NEM_rootd_svcmgr_add: dupe command added");
+		return NEM_err_static("NEM_rootd_svcdef_add: dupe command added");
 	}
 
 	RB_INSERT(NEM_rootd_cmdtree_t, &this->tree, cmd);
