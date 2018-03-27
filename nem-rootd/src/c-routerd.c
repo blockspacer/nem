@@ -22,11 +22,15 @@ static void
 routerd_restart(NEM_thunk1_t *thunk, void *varg)
 {
 	if (!want_running) {
-		printf("c-routerd: nevermind, leave it dead\n");
+		if (NEM_rootd_verbose()) {
+			printf("c-routerd: nevermind, leave it dead\n");
+		}
 		return;
 	}
 	if (is_running) {
-		printf("c-routerd: child resurrected itself?!\n");
+		if (NEM_rootd_verbose()) {
+			printf("c-routerd: child resurrected itself?!\n");
+		}
 		return;
 	}
 
@@ -192,7 +196,10 @@ on_shutdown_msg(NEM_thunk1_t *thunk, void *varg)
 static bool
 try_shutdown()
 {
-	printf("c-routerd: try-shutdown\n");
+	if (NEM_rootd_verbose()) {
+		printf("c-routerd: try-shutdown\n");
+	}
+
 	want_running = false;
 
 	if (is_running && !shutdown_sent) {
@@ -214,7 +221,9 @@ try_shutdown()
 static void
 teardown()
 {
-	printf("c-routerd: teardown\n");
+	if (NEM_rootd_verbose()) {
+		printf("c-routerd: teardown\n");
+	}
 	if (is_running) {
 		if (NEM_rootd_verbose()) {
 			printf("c-routerd: killing child\n");

@@ -244,10 +244,6 @@ NEM_msghdr_new(NEM_msghdr_t **out, const void *bs, size_t len)
 		return NEM_err_static("NEM_msghdr_alloc: invalid bson");
 	}
 
-	size_t json_len;
-	char *json = bson_as_canonical_extended_json(&doc, &json_len);
-	free(json);
-
 	NEM_msghdr_t *hdr = NEM_malloc(
 		sizeof(NEM_msghdr_t) + sizeof(NEM_msghdr_work_t)
 	);
