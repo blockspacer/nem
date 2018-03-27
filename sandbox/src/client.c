@@ -14,19 +14,25 @@ on_msg(NEM_thunk_t *thunk, void *varg)
 
 	NEM_msg_t *res;
 	printf(
-		"[child] got command %hu (seq=%lu)\n",
+		"[child] got command %s/%s %hu (seq=%lu)\n",
+		NEM_svcid_to_string(ca->msg->packed.service_id),
+		NEM_cmdid_to_string(ca->msg->packed.service_id, ca->msg->packed.command_id),
 		ca->msg->packed.command_id,
 		ca->msg->packed.seq
 	);
 
+	if (ca->msg->packed.service_id != NEM_svcid_daemon) {
+		return;
+	}
+
 	switch (ca->msg->packed.command_id) {
-		case 1:
+		case NEM_cmdid_daemon_info:
 			res = NEM_msg_new(0, 6);
 			memcpy(res->body, "hello", 6);
 			res->packed.seq = ca->msg->packed.seq;
 			break;
 
-		case 2:
+		case NEM_cmdid_daemon_stop:
 			res = NEM_msg_new(0, 0);
 			res->packed.seq = ca->msg->packed.seq;
 			NEM_app_stop(app);

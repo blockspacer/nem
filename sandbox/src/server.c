@@ -25,7 +25,8 @@ on_child_msg(NEM_thunk_t *thunk, void *varg)
 			printf("[parent] telling child to die\n");
 			NEM_msg_t *msg = NEM_msg_new(0, 0);
 			msg->packed.seq = 2;
-			msg->packed.command_id = 2;
+			msg->packed.service_id = NEM_svcid_daemon;
+			msg->packed.command_id = NEM_cmdid_daemon_stop;
 			NEM_chan_send(&child->chan, msg);
 			break;
 		}
@@ -59,7 +60,8 @@ main(int argc, char *argv[])
 	NEM_chan_on_msg(&child.chan, NEM_thunk_new_ptr(on_child_msg, &child));
 
 	NEM_msg_t *msg = NEM_msg_new(0, 0);
-	msg->packed.command_id = 1;
+	msg->packed.service_id = NEM_svcid_daemon;
+	msg->packed.command_id = NEM_cmdid_daemon_info;
 	msg->packed.seq = 1;
 
 	NEM_chan_send(&child.chan, msg);
