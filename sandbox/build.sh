@@ -2,7 +2,7 @@
 
 cd `dirname $0`
 
-CC=clang37
+CC=clang50
 SOURCE_FILES=src/*.c
 
 if `which ccache > /dev/null 2>&1` ; then
@@ -13,6 +13,7 @@ LIBS="
 	-L/usr/local/lib
 	-lexecinfo
 	-lz
+	-lbson-1.0
 "
 
 BUILD_FLAGS="

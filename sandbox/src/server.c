@@ -23,7 +23,7 @@ on_child_msg(NEM_thunk_t *thunk, void *varg)
 		case 1: {
 			printf("[parent] child sent %s\n", ca->msg->body);
 			printf("[parent] telling child to die\n");
-			NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+			NEM_msg_t *msg = NEM_msg_new(0, 0);
 			msg->packed.seq = 2;
 			msg->packed.command_id = 2;
 			NEM_chan_send(&child->chan, msg);
@@ -58,7 +58,7 @@ main(int argc, char *argv[])
 
 	NEM_chan_on_msg(&child.chan, NEM_thunk_new_ptr(on_child_msg, &child));
 
-	NEM_msg_t *msg = NEM_msg_alloc(0, 0);
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
 	msg->packed.command_id = 1;
 	msg->packed.seq = 1;
 

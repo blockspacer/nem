@@ -21,13 +21,13 @@ on_msg(NEM_thunk_t *thunk, void *varg)
 
 	switch (ca->msg->packed.command_id) {
 		case 1:
-			res = NEM_msg_alloc(0, 6);
+			res = NEM_msg_new(0, 6);
 			memcpy(res->body, "hello", 6);
 			res->packed.seq = ca->msg->packed.seq;
 			break;
 
 		case 2:
-			res = NEM_msg_alloc(0, 0);
+			res = NEM_msg_new(0, 0);
 			res->packed.seq = ca->msg->packed.seq;
 			NEM_app_stop(app);
 			break;
