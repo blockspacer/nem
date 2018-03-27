@@ -9,7 +9,7 @@ static void
 svc_daemon_info(NEM_thunk_t *thunk, void *varg)
 {
 	if (NEM_rootd_verbose()) {
-		printf("c-svc-daemon: info requested\n");
+		printf("svc-daemon: info requested\n");
 	}
 
 	NEM_rootd_cmd_ca *ca = varg;
@@ -23,7 +23,7 @@ static void
 svc_daemon_getcfg(NEM_thunk_t *thunk, void *varg)
 {
 	if (NEM_rootd_verbose()) {
-		printf("c-svc-daemon: getcfg requested\n");
+		printf("svc-daemon: getcfg requested\n");
 	}
 }
 
@@ -31,7 +31,7 @@ static void
 svc_daemon_setcfg(NEM_thunk_t *thunk, void *varg)
 {
 	if (NEM_rootd_verbose()) {
-		printf("c-svc-daemon: setcfg requested\n");
+		printf("svc-daemon: setcfg requested\n");
 	}
 }
 
@@ -39,7 +39,7 @@ static void
 svc_daemon_stop(NEM_thunk_t *thunk, void *varg)
 {
 	if (NEM_rootd_verbose()) {
-		printf("c-svc-daemon: stop requested\n");
+		printf("svc-daemon: stop requested\n");
 	}
 }
 
@@ -47,7 +47,7 @@ static NEM_err_t
 setup(NEM_app_t *app)
 {
 	if (NEM_rootd_verbose()) {
-		printf("c-svc-daemon: setup\n");
+		printf("svc-daemon: setup\n");
 	}
 
 	static const struct {
@@ -82,13 +82,14 @@ static void
 teardown()
 {
 	if (NEM_rootd_verbose()) {
-		printf("c-svc-daemon: teardown\n");
+		printf("svc-daemon: teardown\n");
 	}
 
 	NEM_rootd_svcdef_free(&NEM_rootd_svc_daemon);
 }
 
 const NEM_rootd_comp_t NEM_rootd_c_svc_daemon = {
+	.name     = "svc-daemon",
 	.setup    = &setup,
 	.teardown = &teardown,
 };

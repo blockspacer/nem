@@ -9,7 +9,7 @@ static NEM_err_t
 setup(NEM_app_t *app)
 {
 	if (NEM_rootd_verbose()) {
-		printf("c-svc-host: setup\n");
+		printf("svc-host: setup\n");
 	}
 
 	static const struct {
@@ -40,13 +40,14 @@ static void
 teardown()
 {
 	if (NEM_rootd_verbose()) {
-		printf("c-svc-host: teardown\n");
+		printf("svc-host: teardown\n");
 	}
 
 	NEM_rootd_svcdef_free(&NEM_rootd_svc_host);
 }
 
 const NEM_rootd_comp_t NEM_rootd_c_svc_host = {
+	.name     = "svc-host",
 	.setup    = &setup,
 	.teardown = &teardown,
 };

@@ -90,6 +90,7 @@ teardown()
 }
 
 const NEM_rootd_comp_t NEM_rootd_c_signal = {
+	.name     = "c-signal",
 	.setup    = &setup,
 	.teardown = &teardown,
 };

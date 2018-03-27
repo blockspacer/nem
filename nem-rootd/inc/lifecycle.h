@@ -6,6 +6,8 @@
 // the reverse order, so any cross-component dependencies can be explicitly
 // annotated by the caller.
 typedef struct {
+	const char *name;
+
 	// setup should initialize the component. Any errors returned prevents
 	// the app from initializing. This is done before the app starts
 	// running, so any network requests that need to be made won't happen

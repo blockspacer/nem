@@ -238,6 +238,7 @@ teardown()
 }
 
 const NEM_rootd_comp_t NEM_rootd_c_routerd = {
+	.name         = "c-routerd",
 	.setup        = &setup,
 	.try_shutdown = &try_shutdown,
 	.teardown     = &teardown,

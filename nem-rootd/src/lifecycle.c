@@ -44,8 +44,17 @@ NEM_rootd_main(int argc, char *argv[])
 
 	for (size_t i = 0; i < num_comps; i += 1) {
 		err = comps[i].comp->setup(&app);
-		// XXX: We really should cleanup here.
 		if (!NEM_err_ok(err)) {
+			if (NEM_rootd_verbose()) {
+				printf(
+					"Error while setting up %s; tearing down\n",
+					comps[i].comp->name
+				);
+			}
+
+			for (size_t j = 1; j <= i; j += 1) {
+				comps[i - j].comp->teardown(&app);
+			}
 			return err;
 		}
 		comps[i].running = true;
