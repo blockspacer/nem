@@ -43,3 +43,9 @@ done
 $CC -o ./bin/dump-geom $BUILD_FLAGS $LIBS \
 	src/dump-geom.c ../libnem/bin/libnem.a -lgeom
 
+mkdir -p obj/client.img/bin
+mkdir -p obj/client.img/lib
+cp `ldd -f '%p ' bin/client` obj/client.img/lib
+cp bin/client obj/client.img/bin
+makefs bin/client.img obj/client.img > /dev/null
+rm -rf obj/client.img
