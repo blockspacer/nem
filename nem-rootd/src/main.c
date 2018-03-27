@@ -2,6 +2,7 @@
 #include "lifecycle.h"
 
 extern const NEM_rootd_comp_t
+	NEM_rootd_c_lockfile,
 	NEM_rootd_c_svc_daemon,
 	NEM_rootd_c_svc_host,
 	NEM_rootd_c_signal,
@@ -12,6 +13,7 @@ int
 main(int argc, char *argv[])
 {
 	NEM_rootd_add_comp(&NEM_rootd_c_signal);
+	NEM_rootd_add_comp(&NEM_rootd_c_lockfile);
 	NEM_rootd_add_comp(&NEM_rootd_c_svc_daemon);
 	NEM_rootd_add_comp(&NEM_rootd_c_svc_host);
 	NEM_rootd_add_comp(&NEM_rootd_c_routerd);

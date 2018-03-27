@@ -6,8 +6,6 @@
 #include "lifecycle.h"
 #include "state.h"
 
-static int lock_fd;
-
 static NEM_err_t
 path_join(char **out, const char *base, const char *rest)
 {
@@ -64,37 +62,6 @@ make_directories(const char *base)
 }
 
 static NEM_err_t
-open_lockfile(const char *base)
-{
-	char *lock_path;
-	NEM_err_t err = path_join(&lock_path, base, "lock");
-	if (!NEM_err_ok(err)) {
-		return err;
-	}
-
-	if (NEM_rootd_verbose()) {
-		printf("c-jails: locking\n");
-	}
-
-	lock_fd = open(lock_path, O_CREAT|O_NOFOLLOW|O_CLOEXEC, 0600);
-	free(lock_path);
-	if (0 > lock_fd) {
-		return NEM_err_errno();
-	}
-
-	if (0 != flock(lock_fd, LOCK_EX|LOCK_NB)) {
-		err = NEM_err_errno();
-		if (NEM_rootd_verbose()) {
-			printf("c-jails: unable to lock lockfile\n");
-		}
-		close(lock_fd);
-		return err;
-	}
-
-	return NEM_err_none;
-}
-
-static NEM_err_t
 setup(NEM_app_t *app)
 {
 	if (NEM_rootd_verbose()) {
@@ -105,11 +72,6 @@ setup(NEM_app_t *app)
 	const char *base = NEM_rootd_jail_root();
 
 	err = make_directories(base);
-	if (!NEM_err_ok(err)) {
-		return err;
-	}
-
-	err = open_lockfile(base);
 	if (!NEM_err_ok(err)) {
 		return err;
 	}
