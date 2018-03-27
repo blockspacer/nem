@@ -194,10 +194,12 @@ NEM_rootd_state_init(int argc, char *argv[])
 	if (verbose) {
 		printf(
 			"nem-rootd starting\n"
+			"   pid        = %d\n"
 			"   reload     = %d\n"
 			"   rootd-path = %s\n"
 			"   routerd    = %s\n"
 			"   jail-root  = %s\n",
+			getpid(),
 			reload,
 			rootd_path,
 			routerd_path,

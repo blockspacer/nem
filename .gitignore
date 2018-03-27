@@ -3,3 +3,4 @@ obj
 *.swp
 *.core
 /vgcore.*
+/nem-rootd/jails

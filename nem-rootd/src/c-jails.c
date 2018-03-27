@@ -11,19 +11,11 @@ static int lock_fd;
 static NEM_err_t
 path_join(char **out, const char *base, const char *rest)
 {
-	char joined[PATH_MAX];
-
-	int len = snprintf(joined, sizeof(joined), "%s/%s", base, rest);
-	if (len == 0 || len + 1 < sizeof(joined)) {
-		return NEM_err_static("path_join: path exceeds PATH_MAX");
-	}
-
-	char *resolved = realpath(joined, NULL);
-	if (NULL == resolved) {
+	int ret = asprintf(out, "%s/%s", base, rest);
+	if (0 > ret) {
 		return NEM_err_errno();
 	}
 
-	*out = resolved;
 	return NEM_err_none;
 }
 
@@ -36,6 +28,10 @@ make_directory(const char *base, const char *path)
 		return err;
 	}
 
+	if (NEM_rootd_verbose()) {
+		printf("c-jails: making %s\n", joined);
+	}
+
 	int ret = mkdir(joined, 0755);
 	free(joined);
 
@@ -43,24 +39,6 @@ make_directory(const char *base, const char *path)
 		if (EEXIST != errno) {
 			return NEM_err_errno();
 		}
-	}
-
-	return NEM_err_none;
-}
-
-static NEM_err_t
-open_lockfile(const char *base)
-{
-	char *lock_path;
-	NEM_err_t err = path_join(&lock_path, base, "lock");
-	if (!NEM_err_ok(err)) {
-		return err;
-	}
-
-	lock_fd = open(lock_path, O_CREAT | O_EXLOCK | O_NOFOLLOW | O_CLOEXEC);
-	free(lock_path);
-	if (0 > lock_fd) {
-		return NEM_err_errno();
 	}
 
 	return NEM_err_none;
@@ -80,6 +58,37 @@ make_directories(const char *base)
 		if (!NEM_err_ok(err)) {
 			return err;
 		}
+	}
+
+	return NEM_err_none;
+}
+
+static NEM_err_t
+open_lockfile(const char *base)
+{
+	char *lock_path;
+	NEM_err_t err = path_join(&lock_path, base, "lock");
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
+
+	if (NEM_rootd_verbose()) {
+		printf("c-jails: locking\n");
+	}
+
+	lock_fd = open(lock_path, O_CREAT|O_NOFOLLOW|O_CLOEXEC, 0600);
+	free(lock_path);
+	if (0 > lock_fd) {
+		return NEM_err_errno();
+	}
+
+	if (0 != flock(lock_fd, LOCK_EX|LOCK_NB)) {
+		err = NEM_err_errno();
+		if (NEM_rootd_verbose()) {
+			printf("c-jails: unable to lock lockfile\n");
+		}
+		close(lock_fd);
+		return err;
 	}
 
 	return NEM_err_none;

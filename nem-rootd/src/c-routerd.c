@@ -230,6 +230,7 @@ teardown()
 		}
 		// NB: Set is_running first to signal that the child shouldn't
 		// be freed by the on_child_died.
+		want_running = false;
 		is_running = false;
 		NEM_child_free(&child);
 	}
