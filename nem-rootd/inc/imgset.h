@@ -38,19 +38,20 @@ typedef struct {
 	size_t           imgs_len;
 	size_t           imgs_cap;
 }
-NEM_rootd_imgdb_t;
+NEM_rootd_imgset_t;
 
-void NEM_rootd_imgdb_init(NEM_rootd_imgdb_t *this);
-void NEM_rootd_imgdb_free(NEM_rootd_imgdb_t *this);
+void NEM_rootd_imgset_init(NEM_rootd_imgset_t *this);
+NEM_rootd_imgset_t* NEM_rootd_imgset_copy(const NEM_rootd_imgset_t *this);
+void NEM_rootd_imgset_free(NEM_rootd_imgset_t *this);
 
-NEM_rootd_img_t* NEM_rootd_imgdb_find_img(
-	NEM_rootd_imgdb_t *this,
+NEM_rootd_img_t* NEM_rootd_imgset_find_img(
+	NEM_rootd_imgset_t *this,
 	const char        *name
 );
-NEM_rootd_imgv_t* NEM_rootd_imgdb_find_imgv(
-	NEM_rootd_imgdb_t *this,
+NEM_rootd_imgv_t* NEM_rootd_imgset_find_imgv(
+	NEM_rootd_imgset_t *this,
 	const char        *sha256hex
 );
 
-NEM_rootd_img_t* NEM_rootd_imgdb_add_img(NEM_rootd_imgdb_t *this);
+NEM_rootd_img_t* NEM_rootd_imgset_add_img(NEM_rootd_imgset_t *this);
 NEM_rootd_imgv_t* NEM_rootd_img_add_version(NEM_rootd_img_t *this);

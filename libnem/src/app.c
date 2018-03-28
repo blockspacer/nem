@@ -167,6 +167,9 @@ NEM_app_init(NEM_app_t *this)
 {
 	// Pre-emptively check to see if the fd is valid.
 	if (-1 == fcntl(NEM_APP_FILENO, F_GETFD)) {
+		if (EBADF == errno) {
+			return NEM_err_static("NEM_app_init: didn't get passed a parent fd?");
+		}
 		return NEM_err_errno();
 	}
 

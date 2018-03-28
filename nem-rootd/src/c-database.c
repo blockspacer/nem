@@ -5,6 +5,7 @@
 #include "state.h"
 #include "lifecycle.h"
 #include "c-database.h"
+#include "utils.h"
 
 static char *database_path = NULL;
 static sqlite3 *database = NULL;
@@ -29,7 +30,7 @@ setup(NEM_app_t *app)
 	path_to_abs(&database_path);
 
 	if (SQLITE_OK != sqlite3_open(database_path, &database)) {
-		return NEM_err_static(sqlite3_errmsg(database));
+		return NEM_err_sqlite(database);
 	}
 
 	int err = sqlite3_exec(
@@ -45,7 +46,7 @@ setup(NEM_app_t *app)
 		NULL
 	);
 	if (SQLITE_OK != err) {
-		return NEM_err_static(sqlite3_errmsg(database));
+		return NEM_err_sqlite(database);
 	}
 
 	return NEM_err_none;
@@ -85,7 +86,7 @@ NEM_rootd_db_migrate(
 
 	code = sqlite3_exec(database, "BEGIN", NULL, NULL, NULL);
 	if (SQLITE_OK != code) {
-		return NEM_err_static(sqlite3_errmsg(database));
+		return NEM_err_sqlite(database);
 	}
 
 	code = sqlite3_prepare_v2(
@@ -96,12 +97,12 @@ NEM_rootd_db_migrate(
 		NULL
 	);
 	if (SQLITE_OK != code) {
-		err = NEM_err_static(sqlite3_errmsg(database));
+		err = NEM_err_sqlite(database);
 		goto done;
 	}
 	code = sqlite3_bind_text(stmt_get, 1, component, -1, SQLITE_STATIC);
 	if (SQLITE_OK != code) {
-		err = NEM_err_static(sqlite3_errmsg(database));
+		err = NEM_err_sqlite(database);
 		goto done;
 	}
 
@@ -114,7 +115,7 @@ NEM_rootd_db_migrate(
 	);
 	code = sqlite3_bind_text(stmt_up, 1, component, -1, SQLITE_STATIC);
 	if (SQLITE_OK != code) {
-		err = NEM_err_static(sqlite3_errmsg(database));
+		err = NEM_err_sqlite(database);
 		goto done;
 	}
 
@@ -126,7 +127,7 @@ NEM_rootd_db_migrate(
 			ver = sqlite3_column_int(stmt_get, 0);
 		}
 		if (SQLITE_OK != sqlite3_reset(stmt_get)) {
-			err = NEM_err_static(sqlite3_errmsg(database));
+			err = NEM_err_sqlite(database);
 			goto done;
 		}
 
@@ -139,11 +140,11 @@ NEM_rootd_db_migrate(
 
 		code = sqlite3_bind_int(stmt_up, 2, versions[i].version);
 		if (SQLITE_DONE != sqlite3_step(stmt_up)) {
-			err = NEM_err_static(sqlite3_errmsg(database));
+			err = NEM_err_sqlite(database);
 			goto done;
 		}
 		if (SQLITE_OK != sqlite3_reset(stmt_up)) {
-			err = NEM_err_static(sqlite3_errmsg(database));
+			err = NEM_err_sqlite(database);
 			goto done;
 		}
 	}

@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "nem.h"
-#include "imgdb.h"
+#include "imgset.h"
 
 static void
 NEM_rootd_imgv_free(NEM_rootd_imgv_t *this)
@@ -24,13 +24,49 @@ NEM_rootd_img_free(NEM_rootd_img_t *this)
 }
 
 void
-NEM_rootd_imgdb_init(NEM_rootd_imgdb_t *this)
+NEM_rootd_imgset_init(NEM_rootd_imgset_t *this)
 {
 	bzero(this, sizeof(*this));
 }
 
+NEM_rootd_imgset_t*
+NEM_rootd_imgset_copy(const NEM_rootd_imgset_t *this)
+{
+	NEM_rootd_imgset_t *out = NEM_malloc(sizeof(NEM_rootd_imgset_t*));
+	out->imgs_len = this->imgs_len;
+	out->imgs_cap = this->imgs_cap;
+
+	out->imgs = NEM_malloc(sizeof(NEM_rootd_img_t) * out->imgs_cap);
+	for (size_t i = 0; i < this->imgs_len; i += 1) {
+		NEM_rootd_img_t *out_img = &out->imgs[i];
+		NEM_rootd_img_t *img = &this->imgs[i];
+		out_img->id = img->id;
+		out_img->name = strdup(img->name);
+		out_img->versions_len = img->versions_len;
+		out_img->versions_cap = img->versions_cap;
+		out_img->versions = NEM_malloc(
+			sizeof(NEM_rootd_imgv_t) * out_img->versions_cap
+		);
+
+		for (size_t j = 0; i < img->versions_len; j += 1) {
+			NEM_rootd_imgv_t *out_ver = &out_img->versions[j];
+			NEM_rootd_imgv_t *ver = &img->versions[j];
+			out_ver->id = ver->id;
+			out_ver->image_id = ver->image_id;
+			out_ver->created = ver->created;
+			out_ver->size = ver->size;
+			out_ver->sha256 = strdup(ver->sha256);
+			out_ver->version = strdup(ver->version);
+			out_ver->status = ver->status;
+			out_ver->refcount = ver->refcount;
+		}
+	}
+
+	return out;
+}
+
 void
-NEM_rootd_imgdb_free(NEM_rootd_imgdb_t *this)
+NEM_rootd_imgset_free(NEM_rootd_imgset_t *this)
 {
 	for (size_t i = 0; i < this->imgs_len; i += 1) {
 		NEM_rootd_img_free(&this->imgs[i]);
@@ -40,8 +76,8 @@ NEM_rootd_imgdb_free(NEM_rootd_imgdb_t *this)
 }
 
 NEM_rootd_img_t*
-NEM_rootd_imgdb_find_img(
-	NEM_rootd_imgdb_t *this,
+NEM_rootd_imgset_find_img(
+	NEM_rootd_imgset_t *this,
 	const char        *name
 ) {
 	for (size_t i = 0; i < this->imgs_len; i += 1) {
@@ -54,8 +90,8 @@ NEM_rootd_imgdb_find_img(
 }
 
 NEM_rootd_imgv_t*
-NEM_rootd_imgdb_find_imgv(
-	NEM_rootd_imgdb_t *this,
+NEM_rootd_imgset_find_imgv(
+	NEM_rootd_imgset_t *this,
 	const char        *sha256hex
 ) {
 	for (size_t i = 0; i < this->imgs_len; i += 1) {
@@ -73,7 +109,7 @@ NEM_rootd_imgdb_find_imgv(
 }
 
 NEM_rootd_img_t*
-NEM_rootd_imgdb_add_img(NEM_rootd_imgdb_t *this)
+NEM_rootd_imgset_add_img(NEM_rootd_imgset_t *this)
 {
 	if (this->imgs_cap <= this->imgs_len) {
 		this->imgs_cap = this->imgs_cap ? this->imgs_cap * 2 : 8;

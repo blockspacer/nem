@@ -45,7 +45,9 @@ $CC -o ./bin/dump-geom $BUILD_FLAGS $LIBS \
 
 mkdir -p obj/client.img/bin
 mkdir -p obj/client.img/lib
+mkdir -p obj/client.img/libexec
 cp `ldd -f '%p ' bin/client` obj/client.img/lib
 cp bin/client obj/client.img/bin
+cp /libexec/ld-elf.so* obj/client.img/libexec
 makefs bin/client.img obj/client.img > /dev/null
 rm -rf obj/client.img

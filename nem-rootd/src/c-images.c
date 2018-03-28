@@ -8,12 +8,14 @@
 #include "nem.h"
 #include "lifecycle.h"
 #include "state.h"
-#include "imgdb.h"
+#include "imgset.h"
+#include "utils.h"
 #include "c-database.h"
 
 static char *images_path = NULL;
 static char *persisted_path = NULL;
-static NEM_rootd_imgdb_t imgdb;
+static char *shared_mounts_path = NULL;
+static NEM_rootd_imgset_t imgset;
 
 static NEM_err_t
 path_join(char **out, const char *base, const char *rest)
@@ -34,8 +36,9 @@ make_directories(const char *base)
 		char **save;
 	}
 	paths[] = {
-		{ "images",    &images_path    },
-		{ "persisted", &persisted_path },
+		{ "images",        &images_path        },
+		{ "shared_mounts", &shared_mounts_path },
+		{ "persisted",     &persisted_path     },
 	};
 
 	for (size_t i = 0; i < NEM_ARRSIZE(paths); i += 1) {
@@ -77,15 +80,33 @@ images_db_migration_1(sqlite3 *db)
 		NULL
 	);
 	if (SQLITE_OK != code) {
-		return NEM_err_static(sqlite3_errmsg(db));
+		return NEM_err_sqlite(db);
 	}
 
 	return NEM_err_none;
+}
 
+static NEM_err_t
+images_db_migration_2(sqlite3 *db)
+{
+	int code = sqlite3_exec(
+		db,
+		"CREATE UNIQUE INDEX idx_images_version_sha256"
+		" ON image_versions(imgv_sha256);",
+		NULL,
+		NULL,
+		NULL
+	);
+	if (SQLITE_OK != code) {
+		return NEM_err_sqlite(db);
+	}
+
+	return NEM_err_none;
 }
 
 static const NEM_rootd_dbver_t db_migrations[] = {
 	{ .version = 1, .fn = &images_db_migration_1 },
+	{ .version = 2, .fn = &images_db_migration_2 },
 };
 
 static const char*
@@ -197,12 +218,12 @@ load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 		NULL
 	);
 	if (SQLITE_OK != code) {
-		err = NEM_err_static(sqlite3_errmsg(db));
+		err = NEM_err_sqlite(db);
 		goto done;
 	}
 	code = sqlite3_bind_int(stmt, 1, img->id);
 	if (SQLITE_OK != code) {
-		err = NEM_err_static(sqlite3_errmsg(db));
+		err = NEM_err_sqlite(db);
 		goto done;
 	}
 
@@ -247,12 +268,12 @@ load_images()
 		NULL
 	);
 	if (SQLITE_OK != code) {
-		err = NEM_err_static(sqlite3_errmsg(db));
+		err = NEM_err_sqlite(db);
 		goto done;
 	}
 
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
-		NEM_rootd_img_t *img = NEM_rootd_imgdb_add_img(&imgdb);
+		NEM_rootd_img_t *img = NEM_rootd_imgset_add_img(&imgset);
 		bzero(img, sizeof(*img));
 		img->id = sqlite3_column_int(stmt, 0);
 		img->name = strdup((const char*) sqlite3_column_text(stmt, 1));
@@ -303,7 +324,7 @@ purge_extra_files()
 				continue;
 			}
 
-			if (NULL == NEM_rootd_imgdb_find_imgv(&imgdb, ent->d_name)) {
+			if (NULL == NEM_rootd_imgset_find_imgv(&imgset, ent->d_name)) {
 				if (NEM_rootd_verbose()) {
 					printf(
 						"c-images: purging unknown image '%s'\n",
@@ -339,7 +360,7 @@ setup(NEM_app_t *app)
 		printf("c-images: setup\n");
 	}
 
-	NEM_rootd_imgdb_init(&imgdb);
+	NEM_rootd_imgset_init(&imgset);
 
 	NEM_err_t err;
 	const char *base = NEM_rootd_jail_root();
@@ -369,16 +390,16 @@ setup(NEM_app_t *app)
 	}
 
 	if (NEM_rootd_verbose()) {
-		printf("c-images: loaded %lu images\n", imgdb.imgs_len);
-		for (size_t i = 0; i < imgdb.imgs_len; i += 1) {
-			printf(" - %s\n", imgdb.imgs[i].name);
-			for (size_t j = 0; j < imgdb.imgs[i].versions_len; j += 1) {
+		printf("c-images: loaded %lu images\n", imgset.imgs_len);
+		for (size_t i = 0; i < imgset.imgs_len; i += 1) {
+			printf(" - %s\n", imgset.imgs[i].name);
+			for (size_t j = 0; j < imgset.imgs[i].versions_len; j += 1) {
 				printf(
 					"    %12.12s... %12s   %6db %s\n", 
-					imgdb.imgs[i].versions[j].sha256,
-					imgdb.imgs[i].versions[j].version,
-					imgdb.imgs[i].versions[j].size,
-					imgv_status_string(imgdb.imgs[i].versions[j].status)
+					imgset.imgs[i].versions[j].sha256,
+					imgset.imgs[i].versions[j].version,
+					imgset.imgs[i].versions[j].size,
+					imgv_status_string(imgset.imgs[i].versions[j].status)
 				);
 			}
 		}
@@ -404,10 +425,11 @@ teardown()
 		printf("c-images: teardown\n");
 	}
 
-	NEM_rootd_imgdb_free(&imgdb);
+	NEM_rootd_imgset_free(&imgset);
 
 	free(images_path);
 	free(persisted_path);
+	free(shared_mounts_path);
 }
 
 const NEM_rootd_comp_t NEM_rootd_c_images = {
