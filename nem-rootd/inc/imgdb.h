@@ -47,6 +47,10 @@ NEM_rootd_img_t* NEM_rootd_imgdb_find_img(
 	NEM_rootd_imgdb_t *this,
 	const char        *name
 );
+NEM_rootd_imgv_t* NEM_rootd_imgdb_find_imgv(
+	NEM_rootd_imgdb_t *this,
+	const char        *sha256hex
+);
 
 NEM_rootd_img_t* NEM_rootd_imgdb_add_img(NEM_rootd_imgdb_t *this);
 NEM_rootd_imgv_t* NEM_rootd_img_add_version(NEM_rootd_img_t *this);

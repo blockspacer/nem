@@ -53,6 +53,25 @@ NEM_rootd_imgdb_find_img(
 	return NULL;
 }
 
+NEM_rootd_imgv_t*
+NEM_rootd_imgdb_find_imgv(
+	NEM_rootd_imgdb_t *this,
+	const char        *sha256hex
+) {
+	for (size_t i = 0; i < this->imgs_len; i += 1) {
+		NEM_rootd_img_t *img = &this->imgs[i];
+
+		for (size_t j = 0; j < img->versions_len; j += 1) {
+			NEM_rootd_imgv_t *imgv = &img->versions[j];
+			if (!strcmp(imgv->sha256, sha256hex)) {
+				return imgv;
+			}
+		}
+	}
+
+	return NULL;
+}
+
 NEM_rootd_img_t*
 NEM_rootd_imgdb_add_img(NEM_rootd_imgdb_t *this)
 {

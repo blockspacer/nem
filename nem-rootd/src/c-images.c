@@ -2,6 +2,7 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <dirent.h>
 #include <mbedtls/sha256.h>
 
 #include "nem.h"
@@ -271,6 +272,67 @@ done:
 }
 
 static NEM_err_t
+purge_extra_files()
+{
+	int fd = open(images_path, O_RDONLY);
+	if (0 > fd) {
+		return NEM_err_errno();
+	}
+
+	NEM_err_t err = NEM_err_none;
+	long basep = 0;
+	size_t buf_len = 4096;
+	char *buf = NEM_malloc(buf_len);
+
+	for (;;) {
+		int nbytes = getdirentries(fd, buf, buf_len, &basep);
+		if (0 == nbytes) {
+			break;
+		}
+		if (0 > nbytes) {
+			err = NEM_err_errno();
+			goto done;
+		}
+
+		size_t off = 0;
+		while (off < nbytes) {
+			struct dirent *ent = (struct dirent*) &buf[off];
+			off += ent->d_reclen;
+
+			if (!strcmp(".", ent->d_name) || !strcmp("..", ent->d_name)) {
+				continue;
+			}
+
+			if (NULL == NEM_rootd_imgdb_find_imgv(&imgdb, ent->d_name)) {
+				if (NEM_rootd_verbose()) {
+					printf(
+						"c-images: purging unknown image '%s'\n",
+						ent->d_name
+					);
+				}
+
+				char *file_path = NULL;
+				err = path_join(&file_path, images_path, ent->d_name);
+				if (!NEM_err_ok(err)) {
+					goto done;
+				}
+				int code = unlink(file_path);
+				free(file_path);
+				if (0 != code) {
+					err = NEM_err_errno();
+					goto done;
+				}
+			}
+		}
+	}
+
+done:
+	free(buf);
+	close(fd);
+	return err;
+}
+
+static NEM_err_t
 setup(NEM_app_t *app)
 {
 	if (NEM_rootd_verbose()) {
@@ -297,6 +359,11 @@ setup(NEM_app_t *app)
 	}
 
 	err = load_images();
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
+
+	err = purge_extra_files();
 	if (!NEM_err_ok(err)) {
 		return err;
 	}
