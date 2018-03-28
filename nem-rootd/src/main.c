@@ -7,6 +7,7 @@ extern const NEM_rootd_comp_t
 	NEM_rootd_c_svc_host,
 	NEM_rootd_c_signal,
 	NEM_rootd_c_routerd,
+	NEM_rootd_c_images,
 	NEM_rootd_c_jails;
 
 int
@@ -17,6 +18,7 @@ main(int argc, char *argv[])
 	NEM_rootd_add_comp(&NEM_rootd_c_svc_daemon);
 	NEM_rootd_add_comp(&NEM_rootd_c_svc_host);
 	NEM_rootd_add_comp(&NEM_rootd_c_routerd);
+	NEM_rootd_add_comp(&NEM_rootd_c_images);
 	NEM_rootd_add_comp(&NEM_rootd_c_jails);
 
 	NEM_err_t err = NEM_rootd_main(argc, argv);
