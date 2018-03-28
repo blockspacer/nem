@@ -131,11 +131,21 @@ NEM_rootd_db_migrate(
 			goto done;
 		}
 
-		if (ver < versions[i].version) {
-			err = versions[i].fn(database);
-			if (!NEM_err_ok(err)) {
-				goto done;
-			}
+		if (ver >= versions[i].version) {
+			continue;
+		}
+
+		if (NEM_rootd_verbose()) {
+			printf(
+				"c-database: updating %s from %d to %d\n", 
+				component,
+				ver,
+				versions[i].version
+			);
+		}
+		err = versions[i].fn(database);
+		if (!NEM_err_ok(err)) {
+			goto done;
 		}
 
 		code = sqlite3_bind_int(stmt_up, 2, versions[i].version);
