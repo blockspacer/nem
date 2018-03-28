@@ -1,7 +1,6 @@
 #include "nem.h"
 #include "state.h"
 #include "lifecycle.h"
-#include "c_routerd.h"
 #include "txnmgr.h"
 #include "svclist.h"
 

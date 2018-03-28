@@ -1,6 +1,8 @@
 #pragma once
 #include <sys/types.h>
 #include <stdbool.h>
+#include <sqlite3.h>
+
 #include "nem-error.h"
 
 // NEM_rootd_state represents the running state. The intent here is that we
@@ -15,3 +17,5 @@ void NEM_rootd_state_close();
 bool NEM_rootd_verbose();
 const char *NEM_rootd_routerd_path();
 const char *NEM_rootd_jail_root();
+
+

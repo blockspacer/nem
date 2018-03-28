@@ -5,6 +5,10 @@
 #include "nem.h"
 #include "lifecycle.h"
 #include "state.h"
+#include "c-database.h"
+
+static char *images_path = NULL;
+static char *persisted_path = NULL;
 
 static NEM_err_t
 path_join(char **out, const char *base, const char *rest)
@@ -18,24 +22,28 @@ path_join(char **out, const char *base, const char *rest)
 }
 
 static NEM_err_t
-make_directory(const char *base, const char *path)
+make_directories(const char *base)
 {
-	char *joined;
-	NEM_err_t err = path_join(&joined, base, path);
-	if (!NEM_err_ok(err)) {
-		return err;
+	static const struct {
+		const char *path;
+		char **save;
 	}
+	paths[] = {
+		{ "images",    &images_path    },
+		{ "persisted", &persisted_path },
+	};
 
-	if (NEM_rootd_verbose()) {
-		printf("c-images: making %s\n", joined);
-	}
+	for (size_t i = 0; i < NEM_ARRSIZE(paths); i += 1) {
+		NEM_err_t err = path_join(paths[i].save, base, paths[i].path);
+		if (!NEM_err_ok(err)) {
+			return err;
+		}
 
-	int ret = mkdir(joined, 0755);
-	free(joined);
-
-	if (0 > ret) {
-		if (EEXIST != errno) {
-			return NEM_err_errno();
+		int ret = mkdir(*paths[i].save, 0755);
+		if (0 > ret) {
+			if (EEXIST != errno) {
+				return NEM_err_errno();
+			}
 		}
 	}
 
@@ -43,23 +51,37 @@ make_directory(const char *base, const char *path)
 }
 
 static NEM_err_t
-make_directories(const char *base)
+images_db_migration_1(sqlite3 *db)
 {
-	const char *paths[] = {
-		"images",
-		"running",
-		"persisted",
-	};
-
-	for (size_t i = 0; i < NEM_ARRSIZE(paths); i += 1) {
-		NEM_err_t err = make_directory(base, paths[i]);
-		if (!NEM_err_ok(err)) {
-			return err;
-		}
+	int code = sqlite3_exec(
+		db, 
+		"CREATE TABLE images ("
+		"  image_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
+		"  image_name TEXT NOT NULL"
+		"); "
+		"CREATE TABLE image_versions ("
+		"  imgv_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
+		"  imgv_image_id INTEGER NOT NULL REFERENCES images(image_id),"
+		"  imgv_created DATETIME NOT NULL,"
+		"  imgv_size INTEGER NOT NULL,"
+		"  imgv_sha256 TEXT NOT NULL,"
+		"  imgv_version TEXT NOT NULL"
+		");",
+		NULL,
+		NULL,
+		NULL
+	);
+	if (SQLITE_OK != code) {
+		return NEM_err_static(sqlite3_errmsg(db));
 	}
 
 	return NEM_err_none;
+
 }
+
+static const NEM_rootd_dbver_t db_migrations[] = {
+	{ .version = 1, .fn = &images_db_migration_1 },
+};
 
 static NEM_err_t
 setup(NEM_app_t *app)
@@ -72,6 +94,15 @@ setup(NEM_app_t *app)
 	const char *base = NEM_rootd_jail_root();
 
 	err = make_directories(base);
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
+
+	err = NEM_rootd_db_migrate(
+		"images",
+		db_migrations,
+		NEM_ARRSIZE(db_migrations)
+	);
 	if (!NEM_err_ok(err)) {
 		return err;
 	}
@@ -95,6 +126,9 @@ teardown()
 	if (NEM_rootd_verbose()) {
 		printf("c-images: teardown\n");
 	}
+
+	free(images_path);
+	free(persisted_path);
 }
 
 const NEM_rootd_comp_t NEM_rootd_c_images = {
