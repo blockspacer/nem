@@ -2,6 +2,14 @@
 #include <sys/types.h>
 #include <time.h>
 
+typedef enum {
+	NEM_ROOTD_IMGV_OK,
+	NEM_ROOTD_IMGV_BAD_HASH,
+	NEM_ROOTD_IMGV_BAD_SIZE,
+	NEM_ROOTD_IMGV_MISSING,
+}
+NEM_rootd_imgvstat_t;
+
 typedef struct {
 	int       id;
 	int       image_id;
@@ -9,6 +17,9 @@ typedef struct {
 	int       size;
 	char     *sha256;
 	char     *version;
+
+	int status;
+	int refcount;
 }
 NEM_rootd_imgv_t;
 

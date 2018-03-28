@@ -18,6 +18,7 @@ LIBS="
 	-lgeom
 	-lbson-1.0
 	-lsqlite3
+	-lmbedcrypto
 	/home/lye/code/libtoml2/bin/libtoml2.a
 "
 

@@ -1,6 +1,8 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
+#include <mbedtls/sha256.h>
 
 #include "nem.h"
 #include "lifecycle.h"
@@ -85,6 +87,97 @@ static const NEM_rootd_dbver_t db_migrations[] = {
 	{ .version = 1, .fn = &images_db_migration_1 },
 };
 
+static const char*
+imgv_status_string(int status)
+{
+	static const struct {
+		int status;
+		const char *str;
+	}
+	table[] = {
+		{ NEM_ROOTD_IMGV_OK,       "OKAY"     },
+		{ NEM_ROOTD_IMGV_BAD_HASH, "BAD HASH" },
+		{ NEM_ROOTD_IMGV_BAD_SIZE, "BAD SIZE" },
+		{ NEM_ROOTD_IMGV_MISSING,  "MISSING"  },
+	};
+
+	for (size_t i = 0; i < NEM_ARRSIZE(table); i += 1) {
+		if (table[i].status == status) {
+			return table[i].str;
+		}
+	}
+
+	return "UNKNOWN";
+}
+
+static void
+hex_encode(char *out, const char *in, size_t in_len)
+{
+	static const char table[] = {
+		'0', '1', '2', '3', '4', '5', '6', '7',
+		'8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+	};
+	_Static_assert(sizeof(table) == 16, "wtf");
+
+	for (size_t i = 0; i < in_len; i += 1) {
+		out[i*2] = table[(in[i] & 0xf0) >> 4];
+		out[i*2 + 1] = table[in[i] & 0x0f];
+	}
+}
+
+static NEM_err_t
+load_version_status(NEM_rootd_imgv_t *imgv)
+{
+	NEM_err_t err = NEM_err_none;
+	char *path;
+	err = path_join(&path, images_path, imgv->sha256);
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
+
+	int fd = open(path, O_RDONLY|O_NOFOLLOW|O_CLOEXEC);
+	free(path);
+	if (0 > fd) {
+		if (ENOENT == errno) {
+			imgv->status = NEM_ROOTD_IMGV_MISSING;
+			return NEM_err_none;
+		}
+
+		return NEM_err_errno();
+	}
+
+	struct stat sb;
+	if (0 != fstat(fd, &sb)) {
+		close(fd);
+		return NEM_err_errno();
+	}
+	if (sb.st_size != imgv->size) {
+		imgv->status = NEM_ROOTD_IMGV_BAD_SIZE;
+	}
+
+	void *bs = mmap(NULL, sb.st_size, PROT_READ, MAP_NOCORE, fd, 0);
+	unsigned char binhash[32];
+	mbedtls_sha256(bs, sb.st_size, binhash, 0);
+	munmap(bs, sb.st_size);
+	close(fd);
+
+	char hexhash[65] = {0};
+	hex_encode(hexhash, (char*) binhash, sizeof(binhash));
+	if (strcmp(hexhash, imgv->sha256)) {
+		if (NEM_rootd_verbose()) {
+			printf(
+				"c-images: bad hash:\n  wanted: %s\n  actual: %s\n",
+				imgv->sha256,
+				hexhash
+			);
+		}
+
+		imgv->status = NEM_ROOTD_IMGV_BAD_HASH;
+	}
+
+	return NEM_err_none;
+}
+
 static NEM_err_t
 load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 {
@@ -121,6 +214,11 @@ load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 		ver->size = sqlite3_column_int(stmt, 2);
 		ver->sha256 = strdup((const char*) sqlite3_column_text(stmt, 3));
 		ver->version = strdup((const char*) sqlite3_column_text(stmt, 4));
+
+		err = load_version_status(ver);
+		if (!NEM_err_ok(err)) {
+			goto done;
+		}
 	}
 
 done:
@@ -209,10 +307,11 @@ setup(NEM_app_t *app)
 			printf(" - %s\n", imgdb.imgs[i].name);
 			for (size_t j = 0; j < imgdb.imgs[i].versions_len; j += 1) {
 				printf(
-					"    %8s %s (%d bytes)\n", 
+					"    %12.12s... %12s   %6db %s\n", 
 					imgdb.imgs[i].versions[j].sha256,
 					imgdb.imgs[i].versions[j].version,
-					imgdb.imgs[i].versions[j].size
+					imgdb.imgs[i].versions[j].size,
+					imgv_status_string(imgdb.imgs[i].versions[j].status)
 				);
 			}
 		}
