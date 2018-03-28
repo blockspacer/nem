@@ -69,28 +69,15 @@ images_db_migration_1(sqlite3 *db)
 		"); "
 		"CREATE TABLE image_versions ("
 		"  imgv_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
-		"  imgv_image_id INTEGER NOT NULL REFERENCES images(image_id),"
 		"  imgv_created DATETIME NOT NULL,"
 		"  imgv_size INTEGER NOT NULL,"
 		"  imgv_sha256 TEXT NOT NULL,"
 		"  imgv_version TEXT NOT NULL"
-		");",
-		NULL,
-		NULL,
-		NULL
-	);
-	if (SQLITE_OK != code) {
-		return NEM_err_sqlite(db);
-	}
-
-	return NEM_err_none;
-}
-
-static NEM_err_t
-images_db_migration_2(sqlite3 *db)
-{
-	int code = sqlite3_exec(
-		db,
+		"); "
+		"CREATE TABLE image_rels ("
+		"  imgv_id INTEGER NOT NULL REFERENCES image_versions(imgv_id),"
+		"  image_id INTEGER NOT NULL REFERENCES images(image_id)"
+		"); "
 		"CREATE UNIQUE INDEX idx_images_version_sha256"
 		" ON image_versions(imgv_sha256);",
 		NULL,
@@ -106,31 +93,7 @@ images_db_migration_2(sqlite3 *db)
 
 static const NEM_rootd_dbver_t db_migrations[] = {
 	{ .version = 1, .fn = &images_db_migration_1 },
-	{ .version = 2, .fn = &images_db_migration_2 },
 };
-
-static const char*
-imgv_status_string(int status)
-{
-	static const struct {
-		int status;
-		const char *str;
-	}
-	table[] = {
-		{ NEM_ROOTD_IMGV_OK,       "OKAY"     },
-		{ NEM_ROOTD_IMGV_BAD_HASH, "BAD HASH" },
-		{ NEM_ROOTD_IMGV_BAD_SIZE, "BAD SIZE" },
-		{ NEM_ROOTD_IMGV_MISSING,  "MISSING"  },
-	};
-
-	for (size_t i = 0; i < NEM_ARRSIZE(table); i += 1) {
-		if (table[i].status == status) {
-			return table[i].str;
-		}
-	}
-
-	return "UNKNOWN";
-}
 
 static void
 hex_encode(char *out, const char *in, size_t in_len)
@@ -228,14 +191,21 @@ load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 	}
 
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
-		NEM_rootd_imgv_t *ver = NEM_rootd_img_add_version(img);
-		ver->id = sqlite3_column_int(stmt, 0);
-		// XXX: Probably want to check the return value here.
+		NEM_rootd_imgv_t tmp = {
+			.id = sqlite3_column_int(stmt, 0),
+			.size = sqlite3_column_int(stmt, 2),
+			.sha256 = strdup((const char*) sqlite3_column_text(stmt, 3)),
+			.version = strdup((const char*) sqlite3_column_text(stmt, 4)),
+		};
+
 		const char *created_str = (const char*) sqlite3_column_text(stmt, 1);
-		strptime(created_str, "%F %T", &ver->created);
-		ver->size = sqlite3_column_int(stmt, 2);
-		ver->sha256 = strdup((const char*) sqlite3_column_text(stmt, 3));
-		ver->version = strdup((const char*) sqlite3_column_text(stmt, 4));
+		strptime(created_str, "%F %T", &tmp.created);
+
+		NEM_rootd_imgv_t *ver = &tmp;
+		err = NEM_rootd_imgset_add_ver(&imgset, &ver, img);
+		if (!NEM_err_ok(err)) {
+			goto done;
+		}
 
 		err = load_version_status(ver);
 		if (!NEM_err_ok(err)) {
@@ -273,10 +243,16 @@ load_images()
 	}
 
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
-		NEM_rootd_img_t *img = NEM_rootd_imgset_add_img(&imgset);
-		bzero(img, sizeof(*img));
-		img->id = sqlite3_column_int(stmt, 0);
-		img->name = strdup((const char*) sqlite3_column_text(stmt, 1));
+		NEM_rootd_img_t tmp = {
+			.id = sqlite3_column_int(stmt, 0),
+			.name = strdup((const char*) sqlite3_column_text(stmt, 1)),
+		};
+		NEM_rootd_img_t *img = &tmp;
+
+		err = NEM_rootd_imgset_add_img(&imgset, &img);
+		if (!NEM_err_ok(err)) {
+			goto done;
+		}
 
 		err = load_image_versions(db, img);
 		if (!NEM_err_ok(err)) {
@@ -324,7 +300,7 @@ purge_extra_files()
 				continue;
 			}
 
-			if (NULL == NEM_rootd_imgset_find_imgv(&imgset, ent->d_name)) {
+			if (NULL == NEM_rootd_imgset_imgv_by_hash(&imgset, ent->d_name)) {
 				if (NEM_rootd_verbose()) {
 					printf(
 						"c-images: purging unknown image '%s'\n",
@@ -392,14 +368,17 @@ setup(NEM_app_t *app)
 	if (NEM_rootd_verbose()) {
 		printf("c-images: loaded %lu images\n", imgset.imgs_len);
 		for (size_t i = 0; i < imgset.imgs_len; i += 1) {
-			printf(" - %s\n", imgset.imgs[i].name);
-			for (size_t j = 0; j < imgset.imgs[i].versions_len; j += 1) {
+			NEM_rootd_img_t *img = &imgset.imgs[i];
+			printf(" - %s\n", img->name);
+			for (size_t j = 0; j < img->vers_len; j += 1) {
+				int id = img->vers[j];
+				NEM_rootd_imgv_t *ver = NEM_rootd_imgset_imgv_by_id(&imgset, id);
 				printf(
 					"    %12.12s... %12s   %6db %s\n", 
-					imgset.imgs[i].versions[j].sha256,
-					imgset.imgs[i].versions[j].version,
-					imgset.imgs[i].versions[j].size,
-					imgv_status_string(imgset.imgs[i].versions[j].status)
+					ver->sha256,
+					ver->version,
+					ver->size,
+					NEM_rootd_imgv_status_string(ver->status)
 				);
 			}
 		}

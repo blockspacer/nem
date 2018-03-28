@@ -5,22 +5,44 @@
 #include "nem.h"
 #include "imgset.h"
 
+const char*
+NEM_rootd_imgv_status_string(int status)
+{
+	static const struct {
+		int status;
+		const char *str;
+	}
+	table[] = {
+		{ NEM_ROOTD_IMGV_OK,       "OKAY"     },
+		{ NEM_ROOTD_IMGV_MOUNTED,  "MOUNTED"  },
+		{ NEM_ROOTD_IMGV_BAD_HASH, "BAD HASH" },
+		{ NEM_ROOTD_IMGV_BAD_SIZE, "BAD SIZE" },
+		{ NEM_ROOTD_IMGV_MISSING,  "MISSING"  },
+	};
+
+	for (size_t i = 0; i < NEM_ARRSIZE(table); i += 1) {
+		if (table[i].status == status) {
+			return table[i].str;
+		}
+	}
+
+	return "UNKNOWN";
+}
+
 static void
 NEM_rootd_imgv_free(NEM_rootd_imgv_t *this)
 {
 	free(this->sha256);
 	free(this->version);
+	bzero(this, sizeof(*this));
 }
 
 static void
 NEM_rootd_img_free(NEM_rootd_img_t *this)
 {
-	for (size_t i = 0; i < this->versions_len; i += 1) {
-		NEM_rootd_imgv_free(&this->versions[i]);
-	}
-
-	free(this->versions);
 	free(this->name);
+	free(this->vers);
+	bzero(this, sizeof(*this));
 }
 
 void
@@ -29,54 +51,21 @@ NEM_rootd_imgset_init(NEM_rootd_imgset_t *this)
 	bzero(this, sizeof(*this));
 }
 
-NEM_rootd_imgset_t*
-NEM_rootd_imgset_copy(const NEM_rootd_imgset_t *this)
-{
-	NEM_rootd_imgset_t *out = NEM_malloc(sizeof(NEM_rootd_imgset_t*));
-	out->imgs_len = this->imgs_len;
-	out->imgs_cap = this->imgs_cap;
-
-	out->imgs = NEM_malloc(sizeof(NEM_rootd_img_t) * out->imgs_cap);
-	for (size_t i = 0; i < this->imgs_len; i += 1) {
-		NEM_rootd_img_t *out_img = &out->imgs[i];
-		NEM_rootd_img_t *img = &this->imgs[i];
-		out_img->id = img->id;
-		out_img->name = strdup(img->name);
-		out_img->versions_len = img->versions_len;
-		out_img->versions_cap = img->versions_cap;
-		out_img->versions = NEM_malloc(
-			sizeof(NEM_rootd_imgv_t) * out_img->versions_cap
-		);
-
-		for (size_t j = 0; i < img->versions_len; j += 1) {
-			NEM_rootd_imgv_t *out_ver = &out_img->versions[j];
-			NEM_rootd_imgv_t *ver = &img->versions[j];
-			out_ver->id = ver->id;
-			out_ver->image_id = ver->image_id;
-			out_ver->created = ver->created;
-			out_ver->size = ver->size;
-			out_ver->sha256 = strdup(ver->sha256);
-			out_ver->version = strdup(ver->version);
-			out_ver->status = ver->status;
-			out_ver->refcount = ver->refcount;
-		}
-	}
-
-	return out;
-}
-
 void
 NEM_rootd_imgset_free(NEM_rootd_imgset_t *this)
 {
 	for (size_t i = 0; i < this->imgs_len; i += 1) {
 		NEM_rootd_img_free(&this->imgs[i]);
 	}
-
+	for (size_t i = 0; i < this->vers_len; i += 1) {
+		NEM_rootd_imgv_free(&this->vers[i]);
+	}
+	free(this->vers);
 	free(this->imgs);
 }
 
 NEM_rootd_img_t*
-NEM_rootd_imgset_find_img(
+NEM_rootd_imgset_img_by_name(
 	NEM_rootd_imgset_t *this,
 	const char        *name
 ) {
@@ -89,55 +78,191 @@ NEM_rootd_imgset_find_img(
 	return NULL;
 }
 
-NEM_rootd_imgv_t*
-NEM_rootd_imgset_find_imgv(
-	NEM_rootd_imgset_t *this,
-	const char        *sha256hex
-) {
+NEM_rootd_img_t*
+NEM_rootd_imgset_img_by_id(NEM_rootd_imgset_t *this, int id)
+{
 	for (size_t i = 0; i < this->imgs_len; i += 1) {
-		NEM_rootd_img_t *img = &this->imgs[i];
-
-		for (size_t j = 0; j < img->versions_len; j += 1) {
-			NEM_rootd_imgv_t *imgv = &img->versions[j];
-			if (!strcmp(imgv->sha256, sha256hex)) {
-				return imgv;
-			}
+		if (this->imgs[i].id == id) {
+			return &this->imgs[i];
 		}
 	}
 
 	return NULL;
 }
 
-NEM_rootd_img_t*
-NEM_rootd_imgset_add_img(NEM_rootd_imgset_t *this)
-{
-	if (this->imgs_cap <= this->imgs_len) {
-		this->imgs_cap = this->imgs_cap ? this->imgs_cap * 2 : 8;
-		this->imgs = NEM_panic_if_null(realloc(
-			this->imgs,
-			sizeof(NEM_rootd_img_t) * this->imgs_cap
-		));
+NEM_rootd_imgv_t*
+NEM_rootd_imgset_imgv_by_hash(
+	NEM_rootd_imgset_t *this,
+	const char        *sha256hex
+) {
+	for (size_t i = 0; i < this->vers_len; i += 1) {
+		if (!strcmp(this->vers[i].sha256, sha256hex)) {
+			return &this->vers[i];
+		}
 	}
 
-	NEM_rootd_img_t *img = &this->imgs[this->imgs_len];
-	bzero(img, sizeof(*img));
-	this->imgs_len += 1;
-	return img;
+	return NULL;
 }
 
 NEM_rootd_imgv_t*
-NEM_rootd_img_add_version(NEM_rootd_img_t *this)
+NEM_rootd_imgset_imgv_by_id(NEM_rootd_imgset_t *this, int id)
 {
-	if (this->versions_cap <= this->versions_len) {
-		this->versions_cap = this->versions_cap ? this->versions_cap * 2 : 8;
-		this->versions = NEM_panic_if_null(realloc(
-			this->versions,
-			sizeof(NEM_rootd_imgv_t) * this->versions_cap
+	for (size_t i = 0; i < this->vers_len; i += 1) {
+		if (this->vers[i].id == id) {
+			return &this->vers[i];
+		}
+	}
+
+	return NULL;
+}
+
+NEM_err_t
+NEM_rootd_imgset_add_img(
+	NEM_rootd_imgset_t *this,
+	NEM_rootd_img_t   **img
+) {
+	if ((*img)->id == 0) {
+		NEM_rootd_img_free(*img);
+		return NEM_err_static("NEM_rootd_imgset_add_img: invalid id");
+	}
+	if ((*img)->name == NULL || (*img)->name[0] == 0) {
+		NEM_rootd_img_free(*img);
+		return NEM_err_static("NEM_rootd_imgset_add_img: invalid name");
+	}
+
+	for (size_t i = 0; i < this->imgs_len; i += 1) {
+		NEM_rootd_img_t *tmp = &this->imgs[i];
+		if (*img == tmp) {
+			return NEM_err_none;
+		}
+		if (!strcmp((*img)->name, tmp->name)) {
+			bool valid = (*img)->id == tmp->id;
+			NEM_rootd_img_free(*img);
+			if (!valid) {
+				return NEM_err_static(
+					"NEM_rootd_imgset_add_img: dupe name, diff id"
+				);
+			}
+			*img = tmp;
+			return NEM_err_none;
+		}
+		if ((*img)->id == tmp->id) {
+			bool valid = 0 == strcmp((*img)->name, tmp->name);
+			NEM_rootd_img_free(*img);
+			if (!valid) {
+				return NEM_err_static(
+					"NEM_rootd_imgset_add_img: dupe id, diff name"
+				);
+			}
+			*img = tmp;
+			return NEM_err_none;
+		}
+	}
+
+	if (this->imgs_len >= this->imgs_cap) {
+		this->imgs_cap = this->imgs_cap ? this->imgs_cap * 2 : 8;
+		this->imgs = NEM_panic_if_null(realloc(
+			this->imgs,
+			this->imgs_cap * sizeof(this->imgs[0])
 		));
 	}
 
-	NEM_rootd_imgv_t *ver = &this->versions[this->versions_len];
-	bzero(ver, sizeof(*ver));
-	this->versions_len += 1;
-	return ver;
+	memcpy(&this->imgs[this->imgs_len], *img, sizeof(**img));
+	bzero(*img, sizeof(**img));
+	*img = &this->imgs[this->imgs_len];
+	this->imgs_len += 1;
+	return NEM_err_none;
+}
+
+NEM_err_t
+NEM_rootd_imgset_add_ver(
+	NEM_rootd_imgset_t *this,
+	NEM_rootd_imgv_t  **ver,
+	NEM_rootd_img_t    *image
+) {
+	if ((*ver)->id == 0) {
+		NEM_rootd_imgv_free(*ver);
+		return NEM_err_static("NEM_rootd_imgset_add_ver: invalid id");
+	}
+	if ((*ver)->sha256 == NULL || strlen((*ver)->sha256) != 64) {
+		NEM_rootd_imgv_free(*ver);
+		return NEM_err_static("NEM_rootd_imgset_add_ver: invalid hash");
+	}
+	if ((*ver)->version == NULL || (*ver)->version[0] == 0) {
+		NEM_rootd_imgv_free(*ver);
+		return NEM_err_static("NEM_rootd_imgset_add_ver: invalid version");
+	}
+	for (size_t i = 0; i < strlen((*ver)->sha256); i += 1) {
+		char ch = (*ver)->sha256[i];
+		if (ch >= '0' && ch <= '9') {
+			continue;
+		}
+		if (ch >= 'a' && ch <= 'f') {
+			continue;
+		}
+		NEM_rootd_imgv_free(*ver);
+		return NEM_err_static("NEM_rootd_imgset_add_ver: invalid hex hash");
+	}
+
+	for (size_t i = 0; i < this->vers_len; i += 1) {
+		NEM_rootd_imgv_t *tmp = &this->vers[i];
+		if (*ver == tmp) {
+			goto link;
+		}
+
+		if (!strcmp((*ver)->sha256, tmp->sha256)) {
+			goto dupe;
+		}
+		if ((*ver)->id == tmp->id) {
+			goto dupe;
+		}
+		// NB: Don't use the 'version' field as a unique identifier, but 
+		// enforce that it can't be changed.
+		continue;
+	dupe:
+		if ((*ver)->id != tmp->id) {
+			NEM_rootd_imgv_free(*ver);
+			return NEM_err_static("NEM_rootd_imgset_add_ver: dupe, mismatch id");
+		}
+		if (strcmp((*ver)->sha256, tmp->sha256)) {
+			NEM_rootd_imgv_free(*ver);
+			return NEM_err_static("NEM_rootd_imgset_add_ver: dupe, mismatch hash");
+		}
+		if (strcmp((*ver)->version, tmp->version)) {
+			NEM_rootd_imgv_free(*ver);
+			return NEM_err_static("NEM_rootd_imgset_add_ver: dupe, mismatch version");
+		}
+		NEM_rootd_imgv_free(*ver);
+		*ver = tmp;
+		goto link;
+	}
+
+	if (this->vers_len >= this->vers_cap) {
+		this->vers_cap = this->vers_cap ? this->vers_cap * 2 : 8;
+		this->vers = NEM_panic_if_null(realloc(
+			this->vers,
+			this->vers_cap * sizeof(this->vers[0])
+		));
+	}
+
+	memcpy(&this->vers[this->vers_len], *ver, sizeof(**ver));
+	bzero(*ver, sizeof(**ver));
+	*ver = &this->vers[this->vers_len];
+	this->vers_len += 1;
+
+link:
+	if (NULL != image) {
+		if (image->vers_len >= image->vers_cap) {
+			image->vers_cap = image->vers_cap ? image->vers_cap * 2 : 8;
+			image->vers = NEM_panic_if_null(realloc(
+				image->vers,
+				image->vers_cap * sizeof(image->vers[0])
+			));
+		}
+
+		image->vers[image->vers_len] = (*ver)->id;
+		image->vers_len += 1;
+	}
+
+	return NEM_err_none;
 }

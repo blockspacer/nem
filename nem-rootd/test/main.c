@@ -6,13 +6,15 @@ extern Suite
 	*suite_jd(),
 	*suite_txnmgr(),
 	*suite_svcdef(),
-	*suite_svclist();
+	*suite_svclist(),
+	*suite_imgset();
 
 static suite_def suites[] = {
 	&suite_jd,
 	&suite_txnmgr,
 	&suite_svcdef,
 	&suite_svclist,
+	&suite_imgset,
 };
 
 int
