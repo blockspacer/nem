@@ -5,31 +5,12 @@
 #include "nem.h"
 #include "lifecycle.h"
 #include "state.h"
+#include "imgdb.h"
 #include "c-database.h"
-
-typedef struct {
-	int       id;
-	int       image_id;
-	struct tm created;
-	int       size;
-	char     *sha256;
-	char     *version;
-}
-NEM_rootd_imgv_t;
-
-typedef struct {
-	int   id;
-	char *name;
-
-	size_t            num_versions;
-	NEM_rootd_imgv_t *versions;
-}
-NEM_rootd_image_t;
 
 static char *images_path = NULL;
 static char *persisted_path = NULL;
-static size_t num_all_images = 0;
-static NEM_rootd_image_t *all_images = NULL;
+static NEM_rootd_imgdb_t imgdb;
 
 static NEM_err_t
 path_join(char **out, const char *base, const char *rest)
@@ -105,11 +86,10 @@ static const NEM_rootd_dbver_t db_migrations[] = {
 };
 
 static NEM_err_t
-load_image_versions(sqlite3 *db, NEM_rootd_image_t *img)
+load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 {
 	NEM_err_t err = NEM_err_none;
 	sqlite3_stmt *stmt = NULL;
-	size_t cap = 0;
 
 	int code = sqlite3_prepare_v2(
 		db,
@@ -133,14 +113,7 @@ load_image_versions(sqlite3 *db, NEM_rootd_image_t *img)
 	}
 
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
-		if (cap <= img->num_versions) {
-			cap = cap ? 2 * cap : 8;
-			img->versions = NEM_panic_if_null(
-				realloc(img->versions, sizeof(NEM_rootd_imgv_t) * cap)
-			);
-		}
-
-		NEM_rootd_imgv_t *ver = &img->versions[img->num_versions];
+		NEM_rootd_imgv_t *ver = NEM_rootd_img_add_version(img);
 		ver->id = sqlite3_column_int(stmt, 0);
 		// XXX: Probably want to check the return value here.
 		const char *created_str = (const char*) sqlite3_column_text(stmt, 1);
@@ -148,7 +121,6 @@ load_image_versions(sqlite3 *db, NEM_rootd_image_t *img)
 		ver->size = sqlite3_column_int(stmt, 2);
 		ver->sha256 = strdup((const char*) sqlite3_column_text(stmt, 3));
 		ver->version = strdup((const char*) sqlite3_column_text(stmt, 4));
-		img->num_versions += 1;
 	}
 
 done:
@@ -164,7 +136,6 @@ load_images()
 {
 	sqlite3 *db = NEM_rootd_db();
 	NEM_err_t err = NEM_err_none;
-	size_t cap = 0;
 	int code;
 
 	sqlite3_stmt *stmt = NULL;
@@ -182,18 +153,10 @@ load_images()
 	}
 
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
-		if (cap <= num_all_images) {
-			cap = cap ? 2 * cap : 8;
-			all_images = NEM_panic_if_null(
-				realloc(all_images, sizeof(NEM_rootd_image_t) * cap)
-			);
-		}
-
-		NEM_rootd_image_t *img = &all_images[num_all_images];
+		NEM_rootd_img_t *img = NEM_rootd_imgdb_add_img(&imgdb);
 		bzero(img, sizeof(*img));
 		img->id = sqlite3_column_int(stmt, 0);
 		img->name = strdup((const char*) sqlite3_column_text(stmt, 1));
-		num_all_images += 1;
 
 		err = load_image_versions(db, img);
 		if (!NEM_err_ok(err)) {
@@ -215,6 +178,8 @@ setup(NEM_app_t *app)
 	if (NEM_rootd_verbose()) {
 		printf("c-images: setup\n");
 	}
+
+	NEM_rootd_imgdb_init(&imgdb);
 
 	NEM_err_t err;
 	const char *base = NEM_rootd_jail_root();
@@ -239,15 +204,15 @@ setup(NEM_app_t *app)
 	}
 
 	if (NEM_rootd_verbose()) {
-		printf("c-images: loaded %lu images\n", num_all_images);
-		for (size_t i = 0; i < num_all_images; i += 1) {
-			printf(" - %s\n", all_images[i].name);
-			for (size_t j = 0; j < all_images[i].num_versions; j += 1) {
+		printf("c-images: loaded %lu images\n", imgdb.imgs_len);
+		for (size_t i = 0; i < imgdb.imgs_len; i += 1) {
+			printf(" - %s\n", imgdb.imgs[i].name);
+			for (size_t j = 0; j < imgdb.imgs[i].versions_len; j += 1) {
 				printf(
 					"    %8s %s (%d bytes)\n", 
-					all_images[i].versions[j].sha256,
-					all_images[i].versions[j].version,
-					all_images[i].versions[j].size
+					imgdb.imgs[i].versions[j].sha256,
+					imgdb.imgs[i].versions[j].version,
+					imgdb.imgs[i].versions[j].size
 				);
 			}
 		}
@@ -273,14 +238,7 @@ teardown()
 		printf("c-images: teardown\n");
 	}
 
-	for (size_t i = 0; i < num_all_images; i += 1) {
-		for (size_t j = 0; j < all_images[i].num_versions; j += 1) {
-			free(all_images[i].versions[j].sha256);
-			free(all_images[i].versions[j].version);
-		}
-		free(all_images[i].versions);
-		free(all_images[i].name);
-	}
+	NEM_rootd_imgdb_free(&imgdb);
 
 	free(images_path);
 	free(persisted_path);
