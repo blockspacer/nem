@@ -83,6 +83,11 @@ NEM_rootd_db_migrate(
 	sqlite3_stmt *stmt_get = NULL;
 	sqlite3_stmt *stmt_up = NULL;
 
+	code = sqlite3_exec(database, "BEGIN", NULL, NULL, NULL);
+	if (SQLITE_OK != code) {
+		return NEM_err_static(sqlite3_errmsg(database));
+	}
+
 	code = sqlite3_prepare_v2(
 		database,
 		"SELECT COALESCE(version, 0) FROM versions WHERE component = ?1",
@@ -108,12 +113,6 @@ NEM_rootd_db_migrate(
 		NULL
 	);
 	code = sqlite3_bind_text(stmt_up, 1, component, -1, SQLITE_STATIC);
-	if (SQLITE_OK != code) {
-		err = NEM_err_static(sqlite3_errmsg(database));
-		goto done;
-	}
-
-	code = sqlite3_exec(database, "BEGIN", NULL, NULL, NULL);
 	if (SQLITE_OK != code) {
 		err = NEM_err_static(sqlite3_errmsg(database));
 		goto done;
