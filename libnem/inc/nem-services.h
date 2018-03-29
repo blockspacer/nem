@@ -22,6 +22,11 @@ static const uint16_t
 	NEM_cmdid_daemon_stop   = 4;
 
 static const uint16_t
+	NEM_cmdid_router_bind          = 1,
+	NEM_cmdid_router_register_svc  = 2,
+	NEM_cmdid_router_register_http = 3;
+
+static const uint16_t
 	NEM_cmdid_imghost_list_images   = 1,
 	NEM_cmdid_imghost_list_versions = 2,
 	NEM_cmdid_imghost_add_image     = 3,

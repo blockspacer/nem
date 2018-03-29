@@ -17,6 +17,9 @@ static const cmd_data_t host_cmds[] = {
 };
 
 static const cmd_data_t router_cmds[] = {
+	{ NEM_cmdid_router_bind,          "bind"          },
+	{ NEM_cmdid_router_register_svc,  "register-svc"  },
+	{ NEM_cmdid_router_register_http, "register-http" },
 };
 
 static const cmd_data_t imghost_cmds[] = {
