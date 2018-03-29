@@ -25,11 +25,18 @@ NEM_child_init(
 ) {
 	bzero(this, sizeof(*this));
 
+	this->exe_fd = open(path, O_EXEC | O_CLOEXEC);
+	if (0 > this->exe_fd) {
+		return NEM_err_errno();
+	}
+
 	this->state = CHILD_RUNNING;
 	NEM_fd_t fd_out;
 
 	NEM_err_t err = NEM_fd_init_unix(&this->fd, &fd_out, kq);
 	if (!NEM_err_ok(err)) {
+		close(this->exe_fd);
+		this->exe_fd = 0;
 		return err;
 	}
 
@@ -55,13 +62,15 @@ NEM_child_init(
 		char *args[] = { NULL };
 		char *env[] = { NULL };
 
-		execve(path, args, env);
+		fexecve(this->exe_fd, args, env);
 		NEM_panicf_errno("NEM_child_init: execve");
 	}
 	NEM_fd_free(&fd_out);
 	if (NULL != preexec) {
 		NEM_thunk1_discard(&preexec);
 	}
+	close(this->exe_fd);
+	this->exe_fd = 0;
 
 	this->on_kevent = NEM_thunk_new_ptr(
 		&NEM_child_on_kevent,

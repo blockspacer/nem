@@ -4,6 +4,8 @@
 #include "txnmgr.h"
 #include "svclist.h"
 
+#include <sys/capsicum.h>
+
 static NEM_child_t         child;
 static NEM_rootd_txnmgr_t  txnmgr;
 static NEM_rootd_svclist_t svcs;
@@ -34,6 +36,7 @@ routerd_restart(NEM_thunk1_t *thunk, void *varg)
 	}
 
 	NEM_app_t *app = NEM_thunk1_ptr(thunk);
+
 	NEM_err_t err = routerd_start(app);
 	if (!NEM_err_ok(err)) {
 		if (NEM_rootd_verbose()) {
@@ -68,12 +71,14 @@ on_child_died(NEM_thunk1_t *thunk, void *varg)
 		return;
 	}
 
+	const int delay_ms = 1000;
+
 	if (NEM_rootd_verbose()) {
-		printf("c-routerd: child died? restarting in 10ms\n");
+		printf("c-routerd: child died? restarting in %dms\n", delay_ms);
 	}
 
 	NEM_app_t *app = NEM_thunk1_ptr(thunk);
-	NEM_app_after(app, 10, NEM_thunk1_new_ptr(
+	NEM_app_after(app, delay_ms, NEM_thunk1_new_ptr(
 		&routerd_restart,
 		app
 	));
@@ -115,6 +120,71 @@ routerd_dispatch(NEM_thunk_t *thunk, void *varg)
 	}
 }
 
+static void
+routerd_enter(NEM_thunk1_t *thunk, void *varg)
+{
+	NEM_child_t *child = NEM_thunk1_ptr(thunk);
+
+	int rand_fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+	if (0 > rand_fd) {
+		if (NEM_rootd_verbose()) {
+			printf("open /dev/urandom: %s\n", strerror(errno));
+			return;
+		}
+	}
+	if (0 > dup2(rand_fd, NEM_APP_FILENO + 1)) {
+		if (NEM_rootd_verbose()) {
+			printf("dup2: %s\n", strerror(errno));
+			return;
+		}
+	}
+
+	if (0 != cap_enter()) {
+		if (NEM_rootd_verbose()) {
+			printf("cap_enter: %s\n", strerror(errno));
+			return;
+		}
+	}
+
+	cap_rights_t exe_rights;
+	cap_rights_init(&exe_rights, CAP_FEXECVE);
+	if (0 != cap_rights_limit(child->exe_fd, &exe_rights)) {
+		if (NEM_rootd_verbose()) {
+			printf("cap_rights_limit: %s\n", strerror(errno));
+		}
+	}
+
+	cap_rights_t rights;
+	cap_rights_init(&rights,
+		CAP_READ,
+		CAP_WRITE,
+		CAP_FCNTL,
+		CAP_GETSOCKOPT,
+		CAP_GETSOCKNAME,
+		CAP_GETPEERNAME,
+		CAP_EVENT,
+		CAP_KQUEUE_EVENT
+	);
+
+	int fds[] = {
+		NEM_APP_FILENO,
+		NEM_APP_FILENO + 1,
+		STDIN_FILENO,
+		STDOUT_FILENO,
+		STDERR_FILENO,
+	};
+	for (size_t i = 0; i < NEM_ARRSIZE(fds); i += 1) {
+		int fd = fds[i];
+
+		if (0 != cap_rights_limit(fd, &rights)) {
+			if (NEM_rootd_verbose()) {
+				printf("cap_rights_limit: %s\n", strerror(errno));
+				return;
+			}
+		}
+	}
+}
+
 static NEM_err_t
 routerd_start(NEM_app_t *app)
 {
@@ -129,7 +199,7 @@ routerd_start(NEM_app_t *app)
 		// XXX: May want to bind stdout/stderr to something
 		// so we can track/log output. Just leave them the same
 		// as the parent stdout/stderr for now.
-		NULL
+		NEM_thunk1_new_ptr(&routerd_enter, &child)
 	);
 	if (!NEM_err_ok(err)) {
 		return err;

@@ -13,6 +13,7 @@ NEM_child_state_t;
 // nem-rootd).
 typedef struct {
 	int               kq;
+	int               exe_fd;
 	pid_t             pid;
 	NEM_child_state_t state;
 	NEM_fd_t          fd;
