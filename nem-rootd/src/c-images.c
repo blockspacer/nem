@@ -18,17 +18,6 @@ static char *shared_mounts_path = NULL;
 static NEM_rootd_imgset_t imgset;
 
 static NEM_err_t
-path_join(char **out, const char *base, const char *rest)
-{
-	int ret = asprintf(out, "%s/%s", base, rest);
-	if (0 > ret) {
-		return NEM_err_errno();
-	}
-
-	return NEM_err_none;
-}
-
-static NEM_err_t
 make_directories(const char *base)
 {
 	static const struct {
@@ -42,7 +31,7 @@ make_directories(const char *base)
 	};
 
 	for (size_t i = 0; i < NEM_ARRSIZE(paths); i += 1) {
-		NEM_err_t err = path_join(paths[i].save, base, paths[i].path);
+		NEM_err_t err = NEM_path_join(paths[i].save, base, paths[i].path);
 		if (!NEM_err_ok(err)) {
 			return err;
 		}
@@ -115,7 +104,7 @@ load_version_status(NEM_rootd_imgv_t *imgv)
 {
 	NEM_err_t err = NEM_err_none;
 	char *path;
-	err = path_join(&path, images_path, imgv->sha256);
+	err = NEM_path_join(&path, images_path, imgv->sha256);
 	if (!NEM_err_ok(err)) {
 		return err;
 	}
@@ -311,7 +300,7 @@ purge_extra_files()
 				}
 
 				char *file_path = NULL;
-				err = path_join(&file_path, images_path, ent->d_name);
+				err = NEM_path_join(&file_path, images_path, ent->d_name);
 				if (!NEM_err_ok(err)) {
 					goto done;
 				}
@@ -419,3 +408,4 @@ const NEM_rootd_comp_t NEM_rootd_c_images = {
 	.try_shutdown = &try_shutdown,
 	.teardown     = &teardown,
 };
+

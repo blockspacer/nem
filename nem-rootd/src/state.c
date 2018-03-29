@@ -4,8 +4,9 @@
 #include <unistd.h>
 #include <getopt.h>
 
-#include "state.h"
 #include "nem.h"
+#include "state.h"
+#include "utils.h"
 
 static bool is_init = false;
 static bool is_root = false;
@@ -104,14 +105,6 @@ parse_options(int argc, char *argv[])
 	return NEM_err_none;
 }
 
-static void
-path_to_abs(char **path)
-{
-	char *tmp = *path;
-	*path = NEM_panic_if_null(realpath(*path, NULL));
-	free(tmp);
-}
-
 static mode_t
 get_rights_stat(struct stat *sb)
 {
@@ -166,9 +159,10 @@ check_options()
 		return NEM_err_static("check_options: jail-root not writable");
 	}
 
-	path_to_abs(&rootd_path);
-	path_to_abs(&routerd_path);
-	path_to_abs(&jail_root);
+	NEM_panic_if_err(NEM_path_abs(&rootd_path));
+	NEM_panic_if_err(NEM_path_abs(&routerd_path));
+	NEM_panic_if_err(NEM_path_abs(&jail_root));
+
 	return NEM_err_none;
 }
 

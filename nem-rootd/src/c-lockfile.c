@@ -1,6 +1,7 @@
 #include "nem.h"
 #include "lifecycle.h"
 #include "state.h"
+#include "utils.h"
 
 static int lock_fd;
 static const char *lock_name = "lockfile";
@@ -13,8 +14,13 @@ setup(NEM_app_t *app)
 		printf("c-lockfile: setup\n");
 	}
 
-	if (0 > asprintf(&lock_path, "%s/%s", NEM_rootd_jail_root(), lock_name)) {
-		return NEM_err_errno();
+	NEM_err_t err = NEM_path_join(
+		&lock_path,
+		NEM_rootd_jail_root(),
+		lock_name
+	);
+	if (!NEM_err_ok(err)) {
+		return err;
 	}
 
 	lock_fd = open(lock_path, O_CREAT|O_NOFOLLOW|O_CLOEXEC, 0600);

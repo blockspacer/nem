@@ -4,6 +4,7 @@
 #include "state.h"
 
 NEM_rootd_svcdef_t NEM_rootd_svc_daemon = {};
+char *tmp_dir = NULL;
 
 static void
 svc_daemon_info(NEM_thunk_t *thunk, void *varg)

@@ -10,15 +10,22 @@
 // are stuffed into NEM_pmsg_t.service_id and indicate which service type should
 // be targetted.
 static const uint16_t 
-	NEM_svcid_daemon = 1,
-	NEM_svcid_host   = 2,
-	NEM_svcid_router = 3;
+	NEM_svcid_daemon  = 1,
+	NEM_svcid_host    = 2,
+	NEM_svcid_router  = 3,
+	NEM_svcid_imghost = 4;
 
 static const uint16_t
 	NEM_cmdid_daemon_info   = 1,
 	NEM_cmdid_daemon_getcfg = 2,
 	NEM_cmdid_daemon_setcfg = 3,
 	NEM_cmdid_daemon_stop   = 4;
+
+static const uint16_t
+	NEM_cmdid_imghost_list_images   = 1,
+	NEM_cmdid_imghost_list_versions = 2,
+	NEM_cmdid_imghost_add_image     = 3,
+	NEM_cmdid_imghost_get_image     = 4;
 
 const char* NEM_svcid_to_string(uint16_t svcid);
 bool NEM_svcid_is_routable(uint16_t svcid);

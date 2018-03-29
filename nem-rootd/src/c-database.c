@@ -10,30 +10,35 @@
 static char *database_path = NULL;
 static sqlite3 *database = NULL;
 
-static void
-path_to_abs(char **path)
-{
-	char *tmp = *path;
-	*path = NEM_panic_if_null(realpath(*path, NULL));
-	free(tmp);
-}
-
 NEM_err_t
 setup(NEM_app_t *app)
 {
-	asprintf(&database_path, "%s/db.sqlite3", NEM_rootd_jail_root());
+	NEM_err_t err = NEM_path_join(
+		&database_path,
+		NEM_rootd_jail_root(),
+		"db.sqlite3"
+	);
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
+
+	// NB: Need to touch the file so it gets created.
 	int tmp_fd = open(database_path, O_CREAT|O_RDWR, 0640);
 	if (0 > tmp_fd) {
 		return NEM_err_errno();
 	}
 	close(tmp_fd);
-	path_to_abs(&database_path);
+
+	err = NEM_path_abs(&database_path);
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
 
 	if (SQLITE_OK != sqlite3_open(database_path, &database)) {
 		return NEM_err_sqlite(database);
 	}
 
-	int err = sqlite3_exec(
+	int code = sqlite3_exec(
 		database,
 		"CREATE TABLE IF NOT EXISTS versions"
 		" ( component TEXT PRIMARY KEY"
@@ -45,7 +50,7 @@ setup(NEM_app_t *app)
 		NULL,
 		NULL
 	);
-	if (SQLITE_OK != err) {
+	if (SQLITE_OK != code) {
 		return NEM_err_sqlite(database);
 	}
 

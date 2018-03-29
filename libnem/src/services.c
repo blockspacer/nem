@@ -19,6 +19,13 @@ static const cmd_data_t host_cmds[] = {
 static const cmd_data_t router_cmds[] = {
 };
 
+static const cmd_data_t imghost_cmds[] = {
+	{ NEM_cmdid_imghost_list_images,   "list-images"   },
+	{ NEM_cmdid_imghost_list_versions, "list-versions" },
+	{ NEM_cmdid_imghost_add_image,     "add-image"     },
+	{ NEM_cmdid_imghost_get_image,     "get-image"     },
+};
+
 #define CMD_DEF(name, routable) {\
 	NEM_svcid_##name, #name, routable, name##_cmds, NEM_ARRSIZE(name##_cmds) \
 }
@@ -33,6 +40,7 @@ svc_id_map[] = {
 	CMD_DEF(daemon, false),
 	CMD_DEF(host, false),
 	CMD_DEF(router, false),
+	CMD_DEF(imghost, false),
 };
 #undef CMD_DEF
 
