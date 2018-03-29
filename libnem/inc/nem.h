@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
@@ -25,6 +26,7 @@
 #include "nem-error.h"
 #include "nem-thunk.h"
 #include "nem-panic.h"
+#include "nem-marshal.h"
 #include "nem-stream.h"
 #include "nem-fd.h"
 #include "nem-list.h"
