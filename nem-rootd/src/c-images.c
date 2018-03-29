@@ -172,10 +172,12 @@ load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 	int code = sqlite3_prepare_v2(
 		db,
 		"SELECT "
-		"  imgv_id, imgv_created, imgv_size, imgv_sha256, imgv_version "
-		"FROM image_versions "
-		"WHERE imgv_image_id = ?1"
-		"ORDER BY imgv_id ASC",
+		"  v.imgv_id, v.imgv_created, v.imgv_size,"
+		"  v.imgv_sha256, v.imgv_version "
+		"FROM image_versions v "
+		"JOIN image_rels r ON v.imgv_id = r.imgv_id "
+		"WHERE r.image_id = ?1"
+		"ORDER BY v.imgv_id ASC",
 		-1,
 		&stmt,
 		NULL
