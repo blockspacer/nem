@@ -19,13 +19,37 @@ typedef enum {
 }
 NEM_marshal_type_t;
 
+// NEM_MARSHAL_CASE_VISIT_INT_TYPES is a vistor-style macro that expands
+// NEM_MARSHAL_VISTOR(NEM_marshal_type_t, C-type) for each int type.
+// This is to simplify the marshalling logic since for some formats these
+// are all basically the same code (since several formats just expand them
+// out to int/uint64_t and we truncate them on the C side).
+#define NEM_MARSHAL_CASE_VISIT_INT_TYPES \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT8, uint8_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT16, uint16_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT32, uint32_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT64, uint64_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_INT8, int8_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_INT16, int16_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_INT32, int32_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_INT64, int64_t);
+
 // NB: NEM_marshal_type_t values cannot exceed the 32 currently -- both the
 // typemask and the array flag need to be made larger to handle those values.
 static const int NEM_MARSHAL_TYPEMASK = 64 - 1;
 static const int NEM_MARSHAL_ARRAY    = 64; // struct*+size_t, heap-allocated
+static const int NEM_MARSHAL_PTR      = 128; // struct*, heap-allocated
 
 typedef struct NEM_marshal_field_t NEM_marshal_field_t;
 typedef struct NEM_marshal_map_t NEM_marshal_map_t;
+
+// NEM_marshal_field_type_name returns a string representation of the field
+// type. It's statically allocated.
+const char *NEM_marshal_field_type_name(NEM_marshal_type_t);
+
+// NEM_marshal_field_stride returns the exepected length of the field when
+// marshalled into C.
+size_t NEM_marshal_field_stride(const NEM_marshal_field_t*);
 
 // NEM_marshal_field_t contains the metadata for a single field of a struct.
 struct NEM_marshal_field_t {

@@ -1,7 +1,7 @@
 #include "nem.h"
 
-static const char*
-field_type_name(NEM_marshal_type_t type)
+const char*
+NEM_marshal_field_type_name(NEM_marshal_type_t type)
 {
 	off_t off = (type & NEM_MARSHAL_ARRAY) ? 2 : 0;
 
@@ -24,8 +24,8 @@ field_type_name(NEM_marshal_type_t type)
 	NEM_panicf("field_type_name: invalid type %d", type);
 }
 
-static size_t 
-field_stride(const NEM_marshal_field_t *field)
+size_t 
+NEM_marshal_field_stride(const NEM_marshal_field_t *field)
 {
 	switch (field->type & ~NEM_MARSHAL_TYPEMASK) {
 		case NEM_MARSHAL_UINT8:  return sizeof(uint8_t);
@@ -48,7 +48,6 @@ static void
 free_field(
 	const NEM_marshal_field_t *field,
 	char                      *elem,
-	size_t                     elem_len,
 	NEM_marshal_type_t         type
 ) {
 	if (0 == type) {
@@ -58,19 +57,26 @@ free_field(
 	if (NEM_MARSHAL_ARRAY & type) {
 		type &= ~NEM_MARSHAL_ARRAY;
 		size_t *psz = (size_t*)(elem + field->offset_len);
-		size_t stride = field_stride(field);
+		size_t stride = NEM_marshal_field_stride(field);
 		char *base = *(char**)(elem + field->offset_elem);
 
 		for (size_t i = 0; i < *psz; i += 1) {
 			free_field(
 				field,
 				base + (stride * i),
-				elem_len,
 				type
 			);
 		}
 		free(base);
 		return;
+	}
+	if (NEM_MARSHAL_PTR & type) {
+		type &= ~NEM_MARSHAL_PTR;
+		char *base = *(char**)(elem + field->offset_elem);
+		if (NULL != base) {
+			free_field(field, base, type);
+			free(base);
+		}
 	}
 
 	switch (type) {
@@ -125,6 +131,6 @@ NEM_unmarshal_free(
 
 	for (size_t i = 0; i < mapping->fields_len; i += 1) {
 		const NEM_marshal_field_t *field = &mapping->fields[i];
-		free_field(field, elem, elem_len, 0);
+		free_field(field, elem, 0);
 	}
 }

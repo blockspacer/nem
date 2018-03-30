@@ -16,6 +16,7 @@ LIBS="
 	-lexecinfo
 	-lz
 	-lbson-1.0
+	-ljson-c
 "
 
 BUILD_FLAGS="
@@ -26,6 +27,7 @@ BUILD_FLAGS="
 	-ferror-limit=5
 	-std=c11
 	-isystem/usr/local/include
+	-isystem/usr/local/include/json-c
 	-isystem/usr/local/include/libbson-1.0
 	-Iinc
 "
