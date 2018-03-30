@@ -31,7 +31,6 @@ test_marshal_bson_init(const NEM_marshal_map_t *map, marshal_init_fn fn)
 	free(bs);
 }
 
-/*
 static void
 test_bson_rt_empty(
 	const NEM_marshal_map_t *map,
@@ -76,7 +75,6 @@ test_bson_rt_init(
 	free(bs_in);
 	free(bs_out);
 }
-*/
 
 #define MARSHAL_VISITOR(TY) \
 	START_TEST(marshal_bson_empty_##TY) { \
@@ -84,15 +82,13 @@ test_bson_rt_init(
 	} END_TEST \
 	START_TEST(marshal_bson_init_##TY) { \
 		test_marshal_bson_init(&TY##_m, &TY##_init); \
-	} END_TEST 
-/*
+	} END_TEST \
 	START_TEST(bson_rt_empty_##TY) { \
 		test_bson_rt_empty(&TY##_m, &TY##_cmp); \
 	} END_TEST \
 	START_TEST(bson_rt_init_##TY) { \
 		test_bson_rt_init(&TY##_m, &TY##_cmp, &TY##_init); \
 	} END_TEST
-*/
 
 	MARSHAL_VISIT_TYPES
 #undef MARSHAL_VISITOR
@@ -103,11 +99,9 @@ suite_marshal_bson()
 	tcase_t tests[] = {
 #		define MARSHAL_VISITOR(TY) \
 		{ "marshal_bson_empty_" #TY, &marshal_bson_empty_##TY }, \
-		{ "marshal_bson_init_" #TY,  &marshal_bson_init_##TY  },
-/*
+		{ "marshal_bson_init_" #TY,  &marshal_bson_init_##TY  }, \
 		{ "bson_rt_empty_" #TY,      &bson_rt_empty_##TY      }, \
 		{ "bson_rt_init_" #TY,       &bson_rt_init_##TY       },
-*/
 
 		MARSHAL_VISIT_TYPES
 #		undef MARSHAL_VISITOR
