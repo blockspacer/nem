@@ -116,6 +116,7 @@ free_field(
 			free_field_direct(field, base);
 			free(base);
 		}
+		return;
 	}
 
 	free_field_direct(field, obj + field->offset_elem);

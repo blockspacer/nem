@@ -354,6 +354,29 @@ typedef struct {
 marshal_aryobj_t;
 
 static void
+marshal_aryobj_sub_cmp(const void *vthis, const void *vthat)
+{
+	const marshal_aryobj_sub_t *this = vthis;
+	const marshal_aryobj_sub_t *that = vthat;
+
+	if (this == NULL) {
+		ck_assert_ptr_eq(this, that);
+	}
+	else {
+		ck_assert_ptr_ne(this, that);
+		ck_assert_int_eq(this->i, that->i);
+
+		if (this->s == NULL) {
+			ck_assert_ptr_eq(this->s, that->s);
+		}
+		else {
+			ck_assert_ptr_ne(this->s, that->s);
+			ck_assert_str_eq(this->s, that->s);
+		}
+	}
+}
+
+static void
 marshal_aryobj_init(void *vthis)
 {
 	marshal_aryobj_t *this = vthis;
@@ -377,9 +400,7 @@ marshal_aryobj_cmp(const void *vthis, const void *vthat)
 	}
 	else {
 		for (size_t i = 0; i < this->len; i += 1) {
-			ck_assert_int_eq(this->objs[i].i, that->objs[i].i);
-			ck_assert_ptr_ne(this->objs[i].s, that->objs[i].s);
-			ck_assert_str_eq(this->objs[i].s, that->objs[i].s);
+			marshal_aryobj_sub_cmp(&this->objs[i], &that->objs[i]);
 		}
 	}
 }
@@ -409,6 +430,117 @@ static const NEM_marshal_map_t marshal_aryobj_m = {
 };
 #undef TYPE
 
+typedef struct {
+	uint64_t    *u64;
+	int64_t     *i64;
+	const char **s1;
+	const char **s2;
+	const char **s3;
+	marshal_aryobj_sub_t *o1;
+	marshal_aryobj_sub_t *o2;
+}
+marshal_ptrs_t;
+
+static void
+marshal_ptrs_init(void *vthis)
+{
+	marshal_ptrs_t *this = vthis;
+	this->u64 = NULL;
+	this->i64 = NEM_malloc(sizeof(int64_t));
+	*this->i64 = 42;
+	this->s1 = NULL;
+	this->s2 = NEM_malloc(sizeof(char**));
+	*this->s2 = NULL;
+	this->s3 = NEM_malloc(sizeof(char**));
+	*this->s3 = strdup("hello");
+	this->o1 = NULL;
+	this->o2 = NEM_malloc(sizeof(marshal_aryobj_sub_t));
+	this->o2->i = 56;
+	this->o2->s = strdup("world");
+}
+
+static void
+marshal_ptrs_cmp(const void *vthis, const void *vthat)
+{
+	const marshal_ptrs_t *this = vthis;
+	const marshal_ptrs_t *that = vthat;
+
+	if (this->u64 == NULL) {
+		ck_assert_ptr_eq(this->u64, that->u64);
+	}
+	else {
+		ck_assert_ptr_ne(this->u64, that->u64);
+		ck_assert_int_eq(*this->u64, *that->u64);
+	}
+
+	if (this->i64 == NULL) {
+		ck_assert_ptr_eq(this->i64, that->i64);
+	}
+	else {
+		ck_assert_ptr_ne(this->i64, that->i64);
+		ck_assert_int_eq(*this->i64, *that->i64);
+	}
+
+	if (this->s1 == NULL) {
+		ck_assert_ptr_eq(this->s1, that->s1);
+	}
+	else if (*this->s1 == NULL) {
+		ck_assert_ptr_eq(*this->s1, *that->s1);
+	}
+	else {
+		ck_assert_ptr_ne(this->s1, that->s1);
+		ck_assert_str_eq(*this->s1, *that->s1);
+	}
+
+	if (this->s2 == NULL) {
+		ck_assert_ptr_eq(this->s2, that->s2);
+	}
+	else if (*this->s2 == NULL) {
+		ck_assert_ptr_eq(*this->s2, *that->s2);
+	}
+	else {
+		ck_assert_ptr_ne(this->s2, that->s2);
+		ck_assert_str_eq(*this->s2, *that->s2);
+	}
+
+	if (this->s3 == NULL) {
+		ck_assert_ptr_eq(this->s3, that->s3);
+	}
+	else if (*this->s3 == NULL) {
+		ck_assert_ptr_eq(*this->s3, *that->s3);
+	}
+	else {
+		ck_assert_ptr_ne(this->s3, that->s3);
+		ck_assert_str_eq(*this->s3, *that->s3);
+	}
+
+	marshal_aryobj_sub_cmp(this->o1, that->o1);
+	marshal_aryobj_sub_cmp(this->o2, that->o2);
+}
+
+#define TYPE marshal_ptrs_t
+static const NEM_marshal_field_t marshal_ptrs_fs[] = {
+	{ "u64", NEM_MARSHAL_PTR|NEM_MARSHAL_UINT64, O(u64), -1, NULL },
+	{ "i64", NEM_MARSHAL_PTR|NEM_MARSHAL_INT64,  O(i64), -1, NULL },
+	{ "s1",  NEM_MARSHAL_PTR|NEM_MARSHAL_STRING, O(s1),  -1, NULL },
+	{ "s2",  NEM_MARSHAL_PTR|NEM_MARSHAL_STRING, O(s2),  -1, NULL },
+	{ "s3",  NEM_MARSHAL_PTR|NEM_MARSHAL_STRING, O(s3),  -1, NULL },
+	{
+		"o1", NEM_MARSHAL_PTR|NEM_MARSHAL_STRUCT,
+		O(o1), -1, &marshal_aryobj_sub_m
+	},
+	{
+		"o2", NEM_MARSHAL_PTR|NEM_MARSHAL_STRUCT,
+		O(o2), -1, &marshal_aryobj_sub_m
+	},
+};
+static const NEM_marshal_map_t marshal_ptrs_m = {
+	.fields     = marshal_ptrs_fs,
+	.fields_len = NEM_ARRSIZE(marshal_ptrs_fs),
+	.elem_size  = sizeof(TYPE),
+};
+#undef TYPE
+
 #undef O
 
 /*
@@ -423,7 +555,8 @@ typedef void(*marshal_cmp_fn)(const void*, const void*);
 	MARSHAL_VISITOR(marshal_prims_ary) \
 	MARSHAL_VISITOR(marshal_strs) \
 	MARSHAL_VISITOR(marshal_obj) \
-	MARSHAL_VISITOR(marshal_aryobj)
+	MARSHAL_VISITOR(marshal_aryobj) \
+	MARSHAL_VISITOR(marshal_ptrs)
 
 #define MARSHAL_VISIT_TYPES \
 	MARSHAL_VISIT_TYPES_NOBIN \
