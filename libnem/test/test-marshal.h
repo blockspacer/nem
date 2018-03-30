@@ -153,6 +153,7 @@ static const NEM_marshal_map_t marshal_prims_ary_m = {
 typedef struct {
 	const char *s1;
 	const char *s2;
+	const char *s3;
 }
 marshal_strs_t;
 
@@ -162,7 +163,8 @@ marshal_strs_init(void *vthis)
 	marshal_strs_t *this = vthis;
 
 	this->s1 = strdup("hello");
-	this->s2 = strdup("world");
+	this->s2 = strdup("");
+	this->s3 = NULL;
 }
 
 static void
@@ -180,11 +182,19 @@ marshal_strs_cmp(const void *vthis, const void *vthat)
 	}
 
 	if (NULL == this->s2) {
-		ck_assert_ptr_eq(this->s1, that->s1);
+		ck_assert_ptr_eq(this->s2, that->s2);
 	}
 	else {
 		ck_assert_ptr_ne(this->s2, that->s2);
 		ck_assert_str_eq(this->s2, that->s2);
+	}
+
+	if (NULL == this->s3) {
+		ck_assert_ptr_eq(this->s3, that->s3);
+	}
+	else {
+		ck_assert_ptr_ne(this->s3, that->s3);
+		ck_assert_str_eq(this->s3, that->s3);
 	}
 }
 
@@ -192,6 +202,7 @@ marshal_strs_cmp(const void *vthis, const void *vthat)
 static const NEM_marshal_field_t marshal_strs_fs[] = {
 	{ "s1", NEM_MARSHAL_STRING, O(s1), -1, NULL },
 	{ "s2", NEM_MARSHAL_STRING, O(s2), -1, NULL },
+	{ "s3", NEM_MARSHAL_STRING, O(s3), -1, NULL },
 };
 static const NEM_marshal_map_t marshal_strs_m = {
 	.fields     = marshal_strs_fs,
