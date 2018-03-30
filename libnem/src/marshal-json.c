@@ -15,12 +15,10 @@ NEM_marshal_json_field(
 	const NEM_marshal_field_t *this,
 	const char                *elem
 ) {
-	// NB: NEM_MARSHAL_ARRAY/NEM_MARSHAL_PTR must have already been handled.
-
 	switch (this->type & NEM_MARSHAL_TYPEMASK) {
-#		define NEM_MARSHAL_VISITOR(ntype, ctype) \
-		case ntype: \
-			return json_object_new_int64((int64_t)*(ctype*)elem);
+#		define NEM_MARSHAL_VISITOR(NTYPE, CTYPE) \
+		case NTYPE: \
+			return json_object_new_int64((int64_t)*(CTYPE*)elem);
 		NEM_MARSHAL_CASE_VISIT_INT_TYPES
 #		undef NEM_MARSHAL_VISITOR
 
@@ -62,19 +60,10 @@ NEM_marshal_json_array(
 
 	json_object *jobj = json_object_new_array();
 
-	if (NEM_MARSHAL_STRUCT == this->type) {
-		for (size_t i = 0; i < *sz; i += 1) {
-			json_object *sub = NEM_marshal_json_obj(this->sub, ptr);
-			ptr += stride;
-			json_object_array_add(jobj, sub);
-		}
-	}
-	else {
-		for (size_t i = 0; i < *sz; i += 1) {
-			json_object *sub = NEM_marshal_json_field(this, ptr);
-			ptr += stride;
-			json_object_array_add(jobj, sub);
-		}
+	for (size_t i = 0; i < *sz; i += 1) {
+		json_object *sub = NEM_marshal_json_field(this, ptr);
+		ptr += stride;
+		json_object_array_add(jobj, sub);
 	}
 
 	return jobj;
@@ -226,23 +215,12 @@ NEM_unmarshal_json_array(
 	*psz = json_object_array_length(json);
 	*pdata = NEM_malloc(stride * *psz);
 
-	if ((this->type & NEM_MARSHAL_TYPEMASK) == NEM_MARSHAL_STRUCT) {
-		for (size_t i = 0; i < *psz; i += 1) {
-			NEM_unmarshal_json_obj(
-				this->sub,
-				json_object_array_get_idx(json, i),
-				(*pdata) + stride * i
-			);
-		}
-	}
-	else {
-		for (size_t i = 0; i < *psz; i += 1) {
-			NEM_unmarshal_json_field(
-				this,
-				json_object_array_get_idx(json, i),
-				(*pdata) + stride * i
-			);
-		}
+	for (size_t i = 0; i < *psz; i += 1) {
+		NEM_unmarshal_json_field(
+			this,
+			json_object_array_get_idx(json, i),
+			(*pdata) + stride * i
+		);
 	}
 }
 
