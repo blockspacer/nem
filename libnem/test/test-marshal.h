@@ -197,3 +197,7 @@ typedef void(*marshal_cmp_fn)(const void*, const void*);
 	MARSHAL_VISITOR(marshal_prims) \
 	MARSHAL_VISITOR(marshal_strs) \
 	MARSHAL_VISITOR(marshal_bin)
+
+#define MARSHAL_VISIT_TYPES_NOBIN \
+	MARSHAL_VISITOR(marshal_prims) \
+	MARSHAL_VISITOR(marshal_strs)

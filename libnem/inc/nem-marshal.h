@@ -37,8 +37,21 @@ NEM_marshal_type_t;
 // NB: NEM_marshal_type_t values cannot exceed the 32 currently -- both the
 // typemask and the array flag need to be made larger to handle those values.
 static const int NEM_MARSHAL_TYPEMASK = 64 - 1;
+
+// NEM_MARSHAL_ARRAY is a flag that can be combined with any other
+// NEM_marshal_type_t. It cannot be combined with other flags. It also
+// cannot be combined with NEM_MARSHAL_FIXLEN (which uses the offset_len
+// parameter internally). It indicates that the type is a pointer to an
+// array, and the length of the array is at offset_len.
 static const int NEM_MARSHAL_ARRAY    = 64; // struct*+size_t, heap-allocated
-static const int NEM_MARSHAL_PTR      = 128; // struct*, heap-allocated
+
+// NEM_MARSHAL_PTR is a flag that can be combined with any other
+// NEM_marshal_type_t. It indicates that the value should be heap-allocated
+// rather than statically allocated. If the value is omitted during 
+// unmarshalling, the pointer will be NULL (likewise, it'll be omitted
+// during marshalling if the value is NULL). It cannot be combined with
+// NEM_MARSHAL_ARRAY.
+static const int NEM_MARSHAL_PTR      = 128; // type*, heap-allocated
 
 typedef struct NEM_marshal_field_t NEM_marshal_field_t;
 typedef struct NEM_marshal_map_t NEM_marshal_map_t;
@@ -68,7 +81,7 @@ struct NEM_marshal_field_t {
 	// it's the length of the field rather than an offset into the struct.
 	off_t offset_len;
 
-	// sub is a pointer to the struct metadata for a subdoc/array-type field.
+	// sub is a pointer to the struct metadata for a struct-type field.
 	const NEM_marshal_map_t *sub;
 };
 

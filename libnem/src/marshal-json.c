@@ -4,106 +4,7 @@
 
 #include "nem.h"
 
-static NEM_err_t
-NEM_unmarshal_json_object(
-	const NEM_marshal_map_t *this,
-	json_object             *json,
-	void                    *elem
-);
-
-static NEM_err_t
-NEM_unmarshal_json_field(
-	const NEM_marshal_field_t *this,
-	json_object               *json,
-	void                      *elem
-) {
-	switch (this->type & NEM_MARSHAL_TYPEMASK) {
-#		define NEM_MARSHAL_VISITOR(ntype, ctype) \
-			case ntype: { \
-				if (json_type_int == json_object_get_type(json)) { \
-					*(ctype*)elem = (ctype) json_object_get_int(json); \
-				} \
-			}
-		NEM_MARSHAL_CASE_VISIT_INT_TYPES;
-#		undef NEM_MARSHAL_VISITOR
-
-		case NEM_MARSHAL_BOOL: {
-			if (json_type_boolean == json_object_get_type(json)) {
-				*(bool*)elem = json_object_get_boolean(json);
-			}
-			return NEM_err_none;
-		}
-
-		case NEM_MARSHAL_STRING: {
-			if (json_type_string == json_object_get_type(json)) {
-				size_t len = json_object_get_string_len(json);
-				char **out = (char**)elem;
-				*out = NEM_malloc(len + 1);
-				memcpy(*out, json_object_get_string(json), len);
-				(*out)[len] = 0;
-			}
-			return NEM_err_none;
-		}
-
-		case NEM_MARSHAL_STRUCT: {
-			if (json_type_object == json_object_get_type(json)) {
-				return NEM_unmarshal_json_object(
-					this->sub,
-					json,
-					elem
-				);
-			}
-			return NEM_err_none;
-		}
-
-		default:
-			NEM_panicf(
-				"NEM_unmarshal_json: unsupported type %s",
-				NEM_marshal_field_type_name(this->type)
-			);
-	}
-}
-
-static NEM_err_t
-NEM_unmarshal_json_array(
-	const NEM_marshal_field_t *this,
-	json_object               *json,
-	void                      *elem
-) {
-	NEM_panic("TODO");
-}
-
-static NEM_err_t
-NEM_unmarshal_json_object(
-	const NEM_marshal_map_t *this,
-	json_object             *json,
-	void                    *elem
-) {
-	json_object *sub = NULL;
-	NEM_err_t err = NEM_err_none;
-
-	for (size_t i = 0; i < this->fields_len; i += 1) {
-		const NEM_marshal_field_t *field = &this->fields[i];
-		if (json_object_object_get_ex(json, field->name, &sub)) {
-			if (NEM_MARSHAL_ARRAY & field->type) {
-				err = NEM_unmarshal_json_array(field, sub, elem);
-				if (!NEM_err_ok(err)) {
-					break;
-				}
-			}
-			else {
-				void *elem_field = ((char*)elem) + field->offset_elem;
-				err = NEM_unmarshal_json_field(field, sub, elem_field);
-				if (!NEM_err_ok(err)) {
-					break;
-				}
-			}
-		}
-	}
-
-	return err;
-}
-
+/*
 NEM_err_t
 NEM_unmarshal_json(
 	const NEM_marshal_map_t *this,
@@ -112,29 +13,117 @@ NEM_unmarshal_json(
 	const void              *json,
 	size_t                   json_len
 ) {
-	if (elem_len != this->elem_size) {
-		NEM_panic("NEM_unmarshal_json: invalid elem_len");
+}
+*/
+
+static json_object*
+NEM_marshal_json_obj(
+	const NEM_marshal_map_t *this,
+	const char              *elem
+);
+
+static json_object*
+NEM_marshal_json_field(
+	const NEM_marshal_field_t *this,
+	const char                *obj
+) {
+	// NB: NEM_MARSHAL_ARRAY/NEM_MARSHAL_PTR must have already been h andeld.
+	const char *elem = obj + this->offset_elem;
+
+	switch (this->type & NEM_MARSHAL_TYPEMASK) {
+#		define NEM_MARSHAL_VISITOR(ntype, ctype) \
+		case ntype: \
+			return json_object_new_int64((int64_t)*(ctype*)elem);
+		NEM_MARSHAL_CASE_VISIT_INT_TYPES
+#		undef NEM_MARSHAL_VISITOR
+
+		case NEM_MARSHAL_BOOL:
+			return json_object_new_boolean(*(bool*)elem);
+
+		case NEM_MARSHAL_STRING: {
+			const char **str = (const char**)elem;
+			if (NULL == *str) {
+				return NULL;
+			}
+			return json_object_new_string(*str);
+		}
+
+		case NEM_MARSHAL_STRUCT:
+			return NEM_marshal_json_obj(this->sub, elem);
+
+		default:
+			NEM_panicf(
+				"NEM_marshal_json: unsupported type %s",
+				NEM_marshal_field_type_name(this->type)
+			);
 	}
+}
 
-	bzero(elem, elem_len);
+static json_object*
+NEM_marshal_json_array(
+	const NEM_marshal_field_t *this,
+	const char                *obj
+) {
+	const char *elem = obj + this->offset_elem;
+	const size_t *sz = (const size_t*)(obj + this->offset_len);
+	size_t stride = NEM_marshal_field_stride(this);
 
-	NEM_err_t err = NEM_err_none;
-	json_tokener *parser = json_tokener_new();
-	json_object *object = json_tokener_parse_ex(parser, json, json_len);
-	if (NULL == object) {
-		enum json_tokener_error jerr = json_tokener_get_error(parser);
-		err = NEM_err_static(json_tokener_error_desc(jerr));
+	json_object *jobj = json_object_new_array();
+
+	if (NEM_MARSHAL_STRUCT == this->type) {
+		for (size_t i = 0; i < *sz; i += 1) {
+			json_object *sub = NEM_marshal_json_obj(this->sub, elem);
+			elem += stride;
+			json_object_array_add(jobj, sub);
+		}
 	}
 	else {
-		err = NEM_unmarshal_json_object(this, object, elem);
-		if (!NEM_err_ok(err)) {
-			NEM_unmarshal_free(this, elem, elem_len);
+		for (size_t i = 0; i < *sz; i += 1) {
+			json_object *sub = NEM_marshal_json_field(this, elem);
+			elem += stride;
+			json_object_array_add(jobj, sub);
 		}
 	}
 
-	json_object_put(object);
-	json_tokener_free(parser);
-	return err;
+	return jobj;
+}
+
+static json_object*
+NEM_marshal_json_obj(
+	const NEM_marshal_map_t *this,
+	const char              *elem
+) {
+	json_object *obj = json_object_new_object();
+	json_object *sub = NULL;
+
+	for (size_t i = 0; i < this->fields_len; i += 1) {
+		const NEM_marshal_field_t *field = &this->fields[i];
+		bool is_array = field->type & NEM_MARSHAL_ARRAY;
+		bool is_ptr = field->type & NEM_MARSHAL_PTR;
+		const char *fieldelem = elem;
+
+		if (is_array && is_ptr) {
+			NEM_panic("NEM_marshal_json_obj: field with both ARRAY and PTR");
+		}
+		if (is_array) {
+			sub = NEM_marshal_json_array(field, fieldelem);
+		}
+		else {
+			if (is_ptr) {
+				fieldelem = *(char**)(elem + field->offset_elem);
+				if (NULL == fieldelem) {
+					continue;
+				}
+			}
+
+			sub = NEM_marshal_json_field(field, fieldelem);
+		}
+		if (NULL != sub) {
+			json_object_object_add(obj, field->name, sub);
+		}
+	}
+
+	return obj;
 }
 
 NEM_err_t
@@ -145,5 +134,19 @@ NEM_marshal_json(
 	const void              *elem,
 	size_t                   elem_len
 ) {
-	NEM_panic("TODO");
+	if (elem_len != this->elem_size) {
+		return NEM_err_static("NEM_marshal_json: invalid elem_size");
+	}
+
+	json_object *obj = NEM_marshal_json_obj(this, elem);
+	if (NULL == obj) {
+		return NEM_err_static("NEM_marshal_json: the unthinkable happened");
+	}
+
+	char *str = strdup(json_object_to_json_string_ext(obj, 0));
+	json_object_put(obj);
+
+	*out = str;
+	*out_len = strlen(str);
+	return NEM_err_none;
 }
