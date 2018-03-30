@@ -297,6 +297,45 @@ static const NEM_marshal_map_t marshal_bin_m = {
 };
 #undef TYPE
 
+/*
+ * marshal_obj
+ */
+
+typedef struct {
+	marshal_prims_t prim;
+	marshal_strs_t  strs;
+}
+marshal_obj_t;
+
+static void
+marshal_obj_init(void *vthis)
+{
+	marshal_obj_t *this = vthis;
+	marshal_prims_init(&this->prim);
+	marshal_strs_init(&this->strs);
+}
+
+static void
+marshal_obj_cmp(const void *vthis, const void *vthat)
+{
+	const marshal_obj_t *this = vthis;
+	const marshal_obj_t *that = vthat;
+
+	marshal_prims_cmp(&this->prim, &that->prim);
+	marshal_strs_cmp(&this->strs, &that->strs);
+}
+
+#define TYPE marshal_obj_t
+static const NEM_marshal_field_t marshal_obj_fs[] = {
+	{ "prim", NEM_MARSHAL_STRUCT, O(prim), -1, &marshal_prims_m },
+	{ "strs", NEM_MARSHAL_STRUCT, O(strs), -1, &marshal_strs_m  },
+};
+static const NEM_marshal_map_t marshal_obj_m = {
+	.fields     = marshal_obj_fs,
+	.fields_len = NEM_ARRSIZE(marshal_obj_fs),
+	.elem_size  = sizeof(TYPE),
+};
+
 #undef O
 
 /*
@@ -306,13 +345,12 @@ static const NEM_marshal_map_t marshal_bin_m = {
 typedef void(*marshal_init_fn)(void*);
 typedef void(*marshal_cmp_fn)(const void*, const void*);
 
-#define MARSHAL_VISIT_TYPES \
-	MARSHAL_VISITOR(marshal_prims) \
-	MARSHAL_VISITOR(marshal_prims_ary) \
-	MARSHAL_VISITOR(marshal_strs) \
-	MARSHAL_VISITOR(marshal_bin)
-
 #define MARSHAL_VISIT_TYPES_NOBIN \
 	MARSHAL_VISITOR(marshal_prims) \
 	MARSHAL_VISITOR(marshal_prims_ary) \
-	MARSHAL_VISITOR(marshal_strs)
+	MARSHAL_VISITOR(marshal_strs) \
+	MARSHAL_VISITOR(marshal_obj)
+
+#define MARSHAL_VISIT_TYPES \
+	MARSHAL_VISIT_TYPES_NOBIN \
+	MARSHAL_VISITOR(marshal_bin)
