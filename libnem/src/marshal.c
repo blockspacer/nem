@@ -3,8 +3,25 @@
 const char*
 NEM_marshal_field_type_name(NEM_marshal_type_t type)
 {
-	off_t off = (type & NEM_MARSHAL_ARRAY) ? 2 : 0;
+	if (type & NEM_MARSHAL_PTR) {
+		switch (type & NEM_MARSHAL_TYPEMASK) {
+			case NEM_MARSHAL_UINT8:  return "*uint8";
+			case NEM_MARSHAL_UINT16: return "*uint16";
+			case NEM_MARSHAL_UINT32: return "*uint32";
+			case NEM_MARSHAL_UINT64: return "*uint64";
+			case NEM_MARSHAL_INT8:   return "*int8";
+			case NEM_MARSHAL_INT16:  return "*int16";
+			case NEM_MARSHAL_INT32:  return "*int32";
+			case NEM_MARSHAL_INT64:  return "*int64";
+			case NEM_MARSHAL_BOOL:   return "*bool";
+			case NEM_MARSHAL_FIXLEN: return "*fixlen";
+			case NEM_MARSHAL_STRING: return "*string";
+			case NEM_MARSHAL_BINARY: return "*binary";
+			case NEM_MARSHAL_STRUCT: return "*struct";
+		}
+	}
 
+	off_t off = (type & NEM_MARSHAL_ARRAY) ? 2 : 0;
 	switch (type & NEM_MARSHAL_TYPEMASK) {
 		case NEM_MARSHAL_UINT8:  return &"[]uint8"[off];
 		case NEM_MARSHAL_UINT16: return &"[]uint16"[off];

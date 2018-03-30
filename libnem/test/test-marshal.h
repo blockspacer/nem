@@ -169,9 +169,9 @@ marshal_prims_ary_cmp(const void *vthis, const void *vthat)
 
 #define TYPE marshal_prims_ary_t
 static const NEM_marshal_field_t marshal_prims_ary_fs[] = {
-	{ "u8s",  NEM_MARSHAL_ARRAY|NEM_MARSHAL_UINT8, O(u8s),  O(u8_len),  NULL },
-	{ "i64s", NEM_MARSHAL_ARRAY|NEM_MARSHAL_INT64, O(i64s), O(i64_len), NULL },
-	{ "ss",   NEM_MARSHAL_ARRAY|NEM_MARSHAL_STRING, O(ss), O(s_len), NULL }
+	{ "u8s",  NEM_MARSHAL_ARRAY|NEM_MARSHAL_UINT8,  O(u8s),  O(u8_len),  NULL },
+	{ "i64s", NEM_MARSHAL_ARRAY|NEM_MARSHAL_INT64,  O(i64s), O(i64_len), NULL },
+	{ "ss",   NEM_MARSHAL_ARRAY|NEM_MARSHAL_STRING, O(ss),   O(s_len),   NULL }
 };
 static const NEM_marshal_map_t marshal_prims_ary_m = {
 	.fields     = marshal_prims_ary_fs,
@@ -436,6 +436,7 @@ typedef struct {
 	const char **s1;
 	const char **s2;
 	const char **s3;
+
 	marshal_aryobj_sub_t *o1;
 	marshal_aryobj_sub_t *o2;
 }
@@ -465,6 +466,11 @@ marshal_ptrs_cmp(const void *vthis, const void *vthat)
 	const marshal_ptrs_t *this = vthis;
 	const marshal_ptrs_t *that = vthat;
 
+	if (this == NULL) {
+		ck_assert_ptr_eq(this, that);
+		return;
+	}
+
 	if (this->u64 == NULL) {
 		ck_assert_ptr_eq(this->u64, that->u64);
 	}
@@ -480,38 +486,33 @@ marshal_ptrs_cmp(const void *vthis, const void *vthat)
 		ck_assert_ptr_ne(this->i64, that->i64);
 		ck_assert_int_eq(*this->i64, *that->i64);
 	}
+	
+	struct {
+		const char **s_this, **s_that;
+	}
+	tests[] = {
+		{ this->s1, that->s1 },
+		{ this->s2, that->s2 },
+		{ this->s3, that->s3 },
+	};
 
-	if (this->s1 == NULL) {
-		ck_assert_ptr_eq(this->s1, that->s1);
-	}
-	else if (*this->s1 == NULL) {
-		ck_assert_ptr_eq(*this->s1, *that->s1);
-	}
-	else {
-		ck_assert_ptr_ne(this->s1, that->s1);
-		ck_assert_str_eq(*this->s1, *that->s1);
-	}
+	for (size_t i = 0; i < NEM_ARRSIZE(tests); i += 1) {
+		const char **s_this = tests[i].s_this;
+		const char **s_that = tests[i].s_that;
+		// NB: There's some interesting things with marshalling
+		// strings pointers. A non-null pointer to a NULL string is
+		// marshalled as empty -- which comes out as a vanilla NULL pointer.
+		bool s_this_null = NULL == s_this || NULL == *s_this;
+		bool s_that_null = NULL == s_that || NULL == *s_that;
 
-	if (this->s2 == NULL) {
-		ck_assert_ptr_eq(this->s2, that->s2);
-	}
-	else if (*this->s2 == NULL) {
-		ck_assert_ptr_eq(*this->s2, *that->s2);
-	}
-	else {
-		ck_assert_ptr_ne(this->s2, that->s2);
-		ck_assert_str_eq(*this->s2, *that->s2);
-	}
-
-	if (this->s3 == NULL) {
-		ck_assert_ptr_eq(this->s3, that->s3);
-	}
-	else if (*this->s3 == NULL) {
-		ck_assert_ptr_eq(*this->s3, *that->s3);
-	}
-	else {
-		ck_assert_ptr_ne(this->s3, that->s3);
-		ck_assert_str_eq(*this->s3, *that->s3);
+		if (s_this_null) {
+			ck_assert(s_that_null);
+		}
+		else {
+			ck_assert_ptr_ne(s_this, s_that);
+			ck_assert_ptr_ne(*s_this, *s_that);
+			ck_assert_str_eq(*s_this, *s_that);
+		}
 	}
 
 	marshal_aryobj_sub_cmp(this->o1, that->o1);
