@@ -37,10 +37,8 @@ marshal_prims_init(void *vthis)
 }
 
 static void
-marshal_prims_cmp(
-	const void *vthis,
-	const void *vthat
-) {
+marshal_prims_cmp(const void *vthis, const void *vthat)
+{
 	const marshal_prims_t *this = vthis;
 	const marshal_prims_t *that = vthat;
 
@@ -75,6 +73,80 @@ static const NEM_marshal_map_t marshal_prims_m = {
 #undef TYPE
 
 /*
+ * marshal_prims_ary_t
+ */
+
+typedef struct {
+	size_t u8_len;
+	uint8_t *u8s;
+
+	size_t i64_len;
+	int64_t *i64s;
+}
+marshal_prims_ary_t;
+
+static void
+marshal_prims_ary_init(void *vthis)
+{
+	marshal_prims_ary_t *this = vthis;
+
+	static const int64_t i64s[] = {
+		42, 56, 42*56
+	};
+
+	this->u8_len = 0; 
+	this->u8s = NULL;
+
+	this->i64_len = NEM_ARRSIZE(i64s);
+	this->i64s = NEM_malloc(sizeof(i64s));
+	memcpy(this->i64s, i64s, sizeof(i64s));
+}
+
+static void
+marshal_prims_ary_cmp(const void *vthis, const void *vthat)
+{
+	const marshal_prims_ary_t *this = vthis;
+	const marshal_prims_ary_t *that = vthat;
+
+	ck_assert_int_eq(this->u8_len, that->u8_len);
+	ck_assert_int_eq(this->i64_len, that->i64_len);
+
+	if (NULL == this->u8s) {
+		ck_assert_int_eq(0, that->u8_len);
+		ck_assert_ptr_eq(NULL, that->u8s);
+	}
+	else {
+		ck_assert_ptr_ne(this->u8s, that->u8s);
+		for (size_t i = 0; i < this->u8_len; i += 1) {
+			ck_assert_int_eq(this->u8s[i], that->u8s[i]);
+		}
+	}
+
+	if (NULL == this->i64s) {
+		ck_assert_int_eq(0, that->i64_len);
+		ck_assert_ptr_eq(NULL, that->i64s);
+	}
+	else {
+		ck_assert_ptr_ne(this->i64s, that->i64s);
+		for (size_t i = 0; i < this->i64_len; i += 1) {
+			ck_assert_int_eq(this->i64s[i], that->i64s[i]);
+		}
+	}
+}
+
+#define TYPE marshal_prims_ary_t
+static const NEM_marshal_field_t marshal_prims_ary_fs[] = {
+	{ "u8s",  NEM_MARSHAL_ARRAY|NEM_MARSHAL_UINT8, O(u8s),  O(u8_len),  NULL },
+	{ "i64s", NEM_MARSHAL_ARRAY|NEM_MARSHAL_INT64, O(i64s), O(i64_len), NULL },
+};
+static const NEM_marshal_map_t marshal_prims_ary_m = {
+	.fields     = marshal_prims_ary_fs,
+	.fields_len = NEM_ARRSIZE(marshal_prims_ary_fs),
+	.elem_size  = sizeof(TYPE),
+};
+#undef TYPE
+
+/*
  * marshal_strs_t
  */
 
@@ -94,10 +166,8 @@ marshal_strs_init(void *vthis)
 }
 
 static void
-marshal_strs_cmp(
-	const void *vthis,
-	const void *vthat
-) {
+marshal_strs_cmp(const void *vthis, const void *vthat)
+{
 	const marshal_strs_t *this = vthis;
 	const marshal_strs_t *that = vthat;
 
@@ -153,10 +223,8 @@ marshal_bin_init(void *vthis)
 }
 
 static void
-marshal_bin_cmp(
-	const void *vthis,
-	const void *vthat
-) {
+marshal_bin_cmp(const void *vthis, const void *vthat)
+{
 	const marshal_bin_t *this = vthis;
 	const marshal_bin_t *that = vthat;
 
@@ -195,9 +263,11 @@ typedef void(*marshal_cmp_fn)(const void*, const void*);
 
 #define MARSHAL_VISIT_TYPES \
 	MARSHAL_VISITOR(marshal_prims) \
+	MARSHAL_VISITOR(marshal_prims_ary) \
 	MARSHAL_VISITOR(marshal_strs) \
 	MARSHAL_VISITOR(marshal_bin)
 
 #define MARSHAL_VISIT_TYPES_NOBIN \
 	MARSHAL_VISITOR(marshal_prims) \
+	MARSHAL_VISITOR(marshal_prims_ary) \
 	MARSHAL_VISITOR(marshal_strs)

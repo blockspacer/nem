@@ -27,7 +27,7 @@ NEM_marshal_field_type_name(NEM_marshal_type_t type)
 size_t 
 NEM_marshal_field_stride(const NEM_marshal_field_t *field)
 {
-	switch (field->type & ~NEM_MARSHAL_TYPEMASK) {
+	switch (field->type & NEM_MARSHAL_TYPEMASK) {
 		case NEM_MARSHAL_UINT8:  return sizeof(uint8_t);
 		case NEM_MARSHAL_UINT16: return sizeof(uint16_t);
 		case NEM_MARSHAL_UINT32: return sizeof(uint32_t);

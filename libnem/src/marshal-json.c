@@ -25,10 +25,9 @@ NEM_marshal_json_obj(
 static json_object*
 NEM_marshal_json_field(
 	const NEM_marshal_field_t *this,
-	const char                *obj
+	const char                *elem
 ) {
-	// NB: NEM_MARSHAL_ARRAY/NEM_MARSHAL_PTR must have already been h andeld.
-	const char *elem = obj + this->offset_elem;
+	// NB: NEM_MARSHAL_ARRAY/NEM_MARSHAL_PTR must have already been handled.
 
 	switch (this->type & NEM_MARSHAL_TYPEMASK) {
 #		define NEM_MARSHAL_VISITOR(ntype, ctype) \
@@ -64,23 +63,28 @@ NEM_marshal_json_array(
 	const NEM_marshal_field_t *this,
 	const char                *obj
 ) {
-	const char *elem = obj + this->offset_elem;
+	char *const*elem = (char*const*)(obj + this->offset_elem);
 	const size_t *sz = (const size_t*)(obj + this->offset_len);
 	size_t stride = NEM_marshal_field_stride(this);
+
+	const char *ptr = *elem;
+	if (NULL == ptr) {
+		return NULL;
+	}
 
 	json_object *jobj = json_object_new_array();
 
 	if (NEM_MARSHAL_STRUCT == this->type) {
 		for (size_t i = 0; i < *sz; i += 1) {
-			json_object *sub = NEM_marshal_json_obj(this->sub, elem);
-			elem += stride;
+			json_object *sub = NEM_marshal_json_obj(this->sub, ptr);
+			ptr += stride;
 			json_object_array_add(jobj, sub);
 		}
 	}
 	else {
 		for (size_t i = 0; i < *sz; i += 1) {
-			json_object *sub = NEM_marshal_json_field(this, elem);
-			elem += stride;
+			json_object *sub = NEM_marshal_json_field(this, ptr);
+			ptr += stride;
 			json_object_array_add(jobj, sub);
 		}
 	}
@@ -114,6 +118,9 @@ NEM_marshal_json_obj(
 				if (NULL == fieldelem) {
 					continue;
 				}
+			}
+			else {
+				fieldelem = elem + field->offset_elem;
 			}
 
 			sub = NEM_marshal_json_field(field, fieldelem);
