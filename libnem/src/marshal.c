@@ -45,41 +45,11 @@ NEM_marshal_field_stride(const NEM_marshal_field_t *field)
 }
 
 static void
-free_field(
+free_field_direct(
 	const NEM_marshal_field_t *field,
-	char                      *elem,
-	NEM_marshal_type_t         type
+	char                      *elem
 ) {
-	if (0 == type) {
-		type = field->type;
-	}
-
-	if (NEM_MARSHAL_ARRAY & type) {
-		type &= ~NEM_MARSHAL_ARRAY;
-		size_t *psz = (size_t*)(elem + field->offset_len);
-		size_t stride = NEM_marshal_field_stride(field);
-		char *base = *(char**)(elem + field->offset_elem);
-
-		for (size_t i = 0; i < *psz; i += 1) {
-			free_field(
-				field,
-				base + (stride * i),
-				type
-			);
-		}
-		free(base);
-		return;
-	}
-	if (NEM_MARSHAL_PTR & type) {
-		type &= ~NEM_MARSHAL_PTR;
-		char *base = *(char**)(elem + field->offset_elem);
-		if (NULL != base) {
-			free_field(field, base, type);
-			free(base);
-		}
-	}
-
-	switch (type) {
+	switch (field->type & NEM_MARSHAL_TYPEMASK) {
 		// Basic fields that don't need anything done.
 		case NEM_MARSHAL_UINT8:
 		case NEM_MARSHAL_UINT16:
@@ -95,7 +65,7 @@ free_field(
 
 		case NEM_MARSHAL_BINARY:
 		case NEM_MARSHAL_STRING: {
-			char **pdata = (char**)(elem + field->offset_elem);
+			char **pdata = (char**)elem;
 			free(*pdata);
 			break;
 		}
@@ -105,12 +75,49 @@ free_field(
 			// to be recursively freed.
 			NEM_unmarshal_free(
 				field->sub,
-				elem + field->offset_elem, 
+				elem,
 				field->sub->elem_size
 			);
 			break;
 		}
 	}
+}
+
+static void
+free_field(
+	const NEM_marshal_field_t *field,
+	char                      *obj,
+	NEM_marshal_type_t         type
+) {
+	if (0 == type) {
+		type = field->type;
+	}
+
+	if (NEM_MARSHAL_ARRAY & type) {
+		type &= ~NEM_MARSHAL_ARRAY;
+		size_t *psz = (size_t*)(obj + field->offset_len);
+		size_t stride = NEM_marshal_field_stride(field);
+		char *base = *(char**)(obj + field->offset_elem);
+
+		for (size_t i = 0; i < *psz; i += 1) {
+			free_field_direct(
+				field,
+				base + (stride * i)
+			);
+		}
+		free(base);
+		return;
+	}
+	if (NEM_MARSHAL_PTR & type) {
+		type &= ~NEM_MARSHAL_PTR;
+		char *base = *(char**)(obj + field->offset_elem);
+		if (NULL != base) {
+			free_field_direct(field, base);
+			free(base);
+		}
+	}
+
+	free_field_direct(field, obj + field->offset_elem);
 }
 
 void

@@ -82,6 +82,9 @@ typedef struct {
 
 	size_t i64_len;
 	int64_t *i64s;
+
+	size_t s_len;
+	char **ss;
 }
 marshal_prims_ary_t;
 
@@ -94,12 +97,24 @@ marshal_prims_ary_init(void *vthis)
 		42, 56, 42*56
 	};
 
+	static const char *ss[] = {
+		"hello", NULL, "world", ""
+	};
+
 	this->u8_len = 0; 
 	this->u8s = NULL;
 
 	this->i64_len = NEM_ARRSIZE(i64s);
 	this->i64s = NEM_malloc(sizeof(i64s));
 	memcpy(this->i64s, i64s, sizeof(i64s));
+
+	this->s_len = NEM_ARRSIZE(ss);
+	this->ss = NEM_malloc(sizeof(ss));
+	for (size_t i = 0; i < NEM_ARRSIZE(ss); i += 1) {
+		if (NULL != ss[i]) {
+			this->ss[i] = strdup(ss[i]);
+		}
+	}
 }
 
 static void
@@ -110,6 +125,7 @@ marshal_prims_ary_cmp(const void *vthis, const void *vthat)
 
 	ck_assert_int_eq(this->u8_len, that->u8_len);
 	ck_assert_int_eq(this->i64_len, that->i64_len);
+	ck_assert_int_eq(this->s_len, that->s_len);
 
 	if (NULL == this->u8s) {
 		ck_assert_int_eq(0, that->u8_len);
@@ -132,12 +148,30 @@ marshal_prims_ary_cmp(const void *vthis, const void *vthat)
 			ck_assert_int_eq(this->i64s[i], that->i64s[i]);
 		}
 	}
+
+	if (NULL == this->ss) {
+		ck_assert_int_eq(0, that->s_len);
+		ck_assert_ptr_eq(NULL, that->ss);
+	}
+	else {
+		ck_assert_ptr_ne(this->ss, that->ss);
+		for (size_t i = 0; i < this->s_len; i += 1) {
+			if (NULL == this->ss[i]) {
+				ck_assert_ptr_eq(NULL, that->ss[i]);
+			}
+			else {
+				ck_assert_ptr_ne(this->ss[i], that->ss[i]);
+				ck_assert_str_eq(this->ss[i], that->ss[i]);
+			}
+		}
+	}
 }
 
 #define TYPE marshal_prims_ary_t
 static const NEM_marshal_field_t marshal_prims_ary_fs[] = {
 	{ "u8s",  NEM_MARSHAL_ARRAY|NEM_MARSHAL_UINT8, O(u8s),  O(u8_len),  NULL },
 	{ "i64s", NEM_MARSHAL_ARRAY|NEM_MARSHAL_INT64, O(i64s), O(i64_len), NULL },
+	{ "ss",   NEM_MARSHAL_ARRAY|NEM_MARSHAL_STRING, O(ss), O(s_len), NULL }
 };
 static const NEM_marshal_map_t marshal_prims_ary_m = {
 	.fields     = marshal_prims_ary_fs,
