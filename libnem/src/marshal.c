@@ -39,6 +39,7 @@ NEM_marshal_field_stride(const NEM_marshal_field_t *field)
 		case NEM_MARSHAL_BOOL:   return sizeof(bool);
 		case NEM_MARSHAL_FIXLEN: return field->offset_len;
 		case NEM_MARSHAL_STRING: return sizeof(char*);
+		case NEM_MARSHAL_STRUCT: return field->sub->elem_size;
 	}
 
 	NEM_panicf("field_stride: invalid type %d", field->type);

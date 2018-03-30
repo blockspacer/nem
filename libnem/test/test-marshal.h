@@ -335,6 +335,79 @@ static const NEM_marshal_map_t marshal_obj_m = {
 	.fields_len = NEM_ARRSIZE(marshal_obj_fs),
 	.elem_size  = sizeof(TYPE),
 };
+#undef TYPE
+
+/*
+ * marshal_aryobj
+ */
+
+typedef struct {
+	int64_t     i;
+	const char *s;
+}
+marshal_aryobj_sub_t;
+
+typedef struct {
+	size_t                len;
+	marshal_aryobj_sub_t *objs;
+}
+marshal_aryobj_t;
+
+static void
+marshal_aryobj_init(void *vthis)
+{
+	marshal_aryobj_t *this = vthis;
+	this->len = 2;
+	this->objs = NEM_malloc(this->len * sizeof(marshal_aryobj_sub_t));
+	this->objs[0].i = 42;
+	this->objs[0].s = strdup("hello");
+	this->objs[1].i = 56;
+	this->objs[1].s = strdup("world");
+}
+
+static void
+marshal_aryobj_cmp(const void *vthis, const void *vthat)
+{
+	const marshal_aryobj_t *this = vthis;
+	const marshal_aryobj_t *that = vthat;
+
+	ck_assert_int_eq(this->len, that->len);
+	if (NULL == this->objs) {
+		ck_assert_ptr_eq(this->objs, that->objs);
+	}
+	else {
+		for (size_t i = 0; i < this->len; i += 1) {
+			ck_assert_int_eq(this->objs[i].i, that->objs[i].i);
+			ck_assert_ptr_ne(this->objs[i].s, that->objs[i].s);
+			ck_assert_str_eq(this->objs[i].s, that->objs[i].s);
+		}
+	}
+}
+
+#define TYPE marshal_aryobj_sub_t
+static const NEM_marshal_field_t marshal_aryobj_sub_fs[] = {
+	{ "i", NEM_MARSHAL_INT64,  O(i), -1, NULL },
+	{ "s", NEM_MARSHAL_STRING, O(s), -1, NULL },
+};
+static const NEM_marshal_map_t marshal_aryobj_sub_m = {
+	.fields     = marshal_aryobj_sub_fs,
+	.fields_len = NEM_ARRSIZE(marshal_aryobj_sub_fs),
+	.elem_size  = sizeof(TYPE),
+};
+#undef TYPE
+#define TYPE marshal_aryobj_t
+static const NEM_marshal_field_t marshal_aryobj_fs[] = {
+	{
+		"objs", NEM_MARSHAL_ARRAY|NEM_MARSHAL_STRUCT,
+		O(objs), O(len), &marshal_aryobj_sub_m
+	},
+};
+static const NEM_marshal_map_t marshal_aryobj_m = {
+	.fields     = marshal_aryobj_fs,
+	.fields_len = NEM_ARRSIZE(marshal_aryobj_fs),
+	.elem_size  = sizeof(TYPE),
+};
+#undef TYPE
 
 #undef O
 
@@ -349,7 +422,8 @@ typedef void(*marshal_cmp_fn)(const void*, const void*);
 	MARSHAL_VISITOR(marshal_prims) \
 	MARSHAL_VISITOR(marshal_prims_ary) \
 	MARSHAL_VISITOR(marshal_strs) \
-	MARSHAL_VISITOR(marshal_obj)
+	MARSHAL_VISITOR(marshal_obj) \
+	MARSHAL_VISITOR(marshal_aryobj)
 
 #define MARSHAL_VISIT_TYPES \
 	MARSHAL_VISIT_TYPES_NOBIN \
