@@ -17,6 +17,9 @@ LIBS="
 	-lz
 	-lbson-1.0
 	-ljson-c
+	-licuuc
+	-lcxxrt
+	../../libtoml2/bin/libtoml2.a
 "
 
 BUILD_FLAGS="
@@ -29,6 +32,7 @@ BUILD_FLAGS="
 	-isystem/usr/local/include
 	-isystem/usr/local/include/json-c
 	-isystem/usr/local/include/libbson-1.0
+	-isystem../../libtoml2/inc
 	-Iinc
 "
 
