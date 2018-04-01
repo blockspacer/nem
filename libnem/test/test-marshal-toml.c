@@ -56,7 +56,6 @@ test_marshal_toml_rt(
 	void *bs1 = NEM_malloc(map->elem_size);
 	void *bs2 = NEM_malloc(map->elem_size);
 
-	init_fn(bs1);
 	init_fn(bs2);
 
 	// NB: toml doesn't support null strings in arrays, so just make the
