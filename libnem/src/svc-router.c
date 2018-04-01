@@ -8,6 +8,7 @@
 #define TYPE NEM_svc_router_bind_t
 static const NEM_marshal_field_t router_bind_fs[] = {
 	{ "port",     NEM_MARSHAL_INT32,  O(port),     -1, NULL },
+	{ "proto",    NEM_MARSHAL_STRING, O(proto),    -1, NULL },
 	{ "cert_pem", NEM_MARSHAL_STRING, O(cert_pem), -1, NULL },
 	{ "key_pem",  NEM_MARSHAL_STRING, O(key_pem),  -1, NULL },
 };
@@ -34,6 +35,7 @@ const NEM_marshal_map_t NEM_svc_router_register_svc_m = {
 
 #define TYPE NEM_svc_router_register_http_t
 static const NEM_marshal_field_t router_register_http_fs[] = {
+	{ "port", NEM_MARSHAL_INT32,  O(port), -1, NULL },
 	{ "host", NEM_MARSHAL_STRING, O(host), -1, NULL },
 	{ "base", NEM_MARSHAL_STRING, O(base), -1, NULL },
 	{ "inst", NEM_MARSHAL_STRING, O(inst), -1, NULL },

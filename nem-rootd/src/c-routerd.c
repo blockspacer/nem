@@ -1,4 +1,5 @@
 #include "nem.h"
+#include "nem-svc-router.h"
 #include "state.h"
 #include "lifecycle.h"
 #include "txnmgr.h"
@@ -6,12 +7,23 @@
 
 #include <sys/capsicum.h>
 
+typedef struct {
+	int         port;
+	int         fd;
+	const char *proto;
+	const char *cert;
+	const char *key;
+}
+port_t;
+
 static NEM_child_t         child;
 static NEM_rootd_txnmgr_t  txnmgr;
 static NEM_rootd_svclist_t svcs;
 static bool                is_running = false;
 static bool                want_running = true;
 static bool                shutdown_sent = false;
+static port_t             *ports;
+static size_t              ports_len;
 
 extern NEM_rootd_svcdef_t
 	NEM_rootd_svc_daemon,
@@ -185,6 +197,117 @@ routerd_enter(NEM_thunk1_t *thunk, void *varg)
 	}
 }
 
+static void
+routerd_send_port_cb(NEM_thunk1_t *thunk, void *varg)
+{
+	NEM_rootd_txn_ca *ca = varg;
+	port_t *port = NEM_thunk1_inlineptr(thunk);
+
+	if (NEM_rootd_verbose()) {
+		if (!NEM_err_ok(ca->err)) {
+			printf(
+				"c-routerd: error sending port %d: %s\n",
+				port->port,
+				NEM_err_string(ca->err)
+			);
+		}
+		else {
+			printf("c-routerd: sent port %d\n", port->port);
+		}
+	}
+}
+
+static void
+routerd_send_port(port_t *port)
+{
+	if (!is_running) {
+		return;
+	}
+
+	void *req_bs;
+	size_t req_len;
+	NEM_svc_router_bind_t req = {
+		.port     = port->port,
+		.proto    = port->proto,
+		.cert_pem = port->cert,
+		.key_pem  = port->key,
+	};
+	NEM_panic_if_err(NEM_marshal_bson(
+		&NEM_svc_router_bind_m,
+		&req_bs,
+		&req_len,
+		&req,
+		sizeof(req)
+	));
+
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
+	msg->packed.service_id = NEM_svcid_router;
+	msg->packed.command_id = NEM_cmdid_router_bind;
+	NEM_msg_set_body(msg, req_bs, req_len);
+	NEM_panic_if_err(NEM_msg_set_fd(msg, port->fd));
+
+	NEM_thunk1_t *thunk = NEM_thunk1_new(
+		&routerd_send_port_cb,
+		sizeof(port_t)
+	);
+	*(port_t*)NEM_thunk1_inlineptr(thunk) = *port;
+	
+	NEM_rootd_txnmgr_req1(&txnmgr, msg, thunk);
+}
+
+static void
+routerd_send_ports()
+{
+	for (size_t i = 0; i < ports_len; i += 1) {
+		routerd_send_port(&ports[i]);
+	}
+}
+
+NEM_err_t
+NEM_rootd_routerd_bind_http(int port)
+{
+	if (0 >= port || port >= UINT16_MAX) {
+		return NEM_err_static("NEM_rootd_router_bind_http: invalid port");
+	}
+
+	int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	if (-1 == fd) {
+		return NEM_err_errno();
+	}
+
+	struct sockaddr_in addr = {};
+	addr.sin_len = sizeof(addr);
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	addr.sin_addr.s_addr = INADDR_ANY;
+	if (-1 == bind(fd, (struct sockaddr*) &addr, sizeof(addr))) {
+		close(fd);
+		return NEM_err_errno();
+	}
+	
+	if (-1 == listen(fd, 1)) {
+		close(fd);
+		return NEM_err_errno();
+	}
+
+	port_t new_port = {
+		.port  = port,
+		.fd    = fd,
+		.proto = "http",
+	};
+
+	ports = NEM_panic_if_null(realloc(
+		ports,
+		(ports_len + 1) * sizeof(port_t)
+	));
+	ports[ports_len] = new_port;
+	ports_len += 1;
+
+	routerd_send_port(&new_port);
+
+	return NEM_err_none;
+}
+
 static NEM_err_t
 routerd_start(NEM_app_t *app)
 {
@@ -222,10 +345,12 @@ routerd_start(NEM_app_t *app)
 	));
 
 	if (NEM_rootd_verbose()) {
-		printf("c-routerd: routerd running, pid=%d\n", child.pid); 
+		printf("\nc-routerd: routerd running, pid=%d\n", child.pid); 
 	}
 
 	is_running = true;
+	routerd_send_ports();
+
 	return NEM_err_none;
 }
 
@@ -313,4 +438,3 @@ const NEM_rootd_comp_t NEM_rootd_c_routerd = {
 	.try_shutdown = &try_shutdown,
 	.teardown     = &teardown,
 };
-

@@ -180,5 +180,16 @@ NEM_rootd_txnmgr_req1(
 	msg->packed.seq = this->next_seq;
 	this->next_seq += 1;
 
+	if (NEM_rootd_verbose()) {
+		printf(
+			"txnmgr: sending %s/%s seq=%lu bodylen=%u headerlen=%hu\n",
+			NEM_svcid_to_string(msg->packed.service_id),
+			NEM_cmdid_to_string(msg->packed.service_id, msg->packed.command_id),
+			msg->packed.seq,
+			msg->packed.body_len,
+			msg->packed.header_len
+		);
+	}
+
 	NEM_chan_send(this->chan, msg);
 }

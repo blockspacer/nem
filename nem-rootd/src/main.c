@@ -1,5 +1,6 @@
 #include "nem.h"
 #include "lifecycle.h"
+#include "c-routerd.h"
 
 extern const NEM_rootd_comp_t
 	NEM_rootd_c_lockfile,
@@ -24,6 +25,8 @@ main(int argc, char *argv[])
 	NEM_rootd_add_comp(&NEM_rootd_c_svc_host);
 	NEM_rootd_add_comp(&NEM_rootd_c_svc_imghost);
 	NEM_rootd_add_comp(&NEM_rootd_c_jails);
+
+	NEM_panic_if_err(NEM_rootd_routerd_bind_http(3000));
 
 	NEM_err_t err = NEM_rootd_main(argc, argv);
 	if (!NEM_err_ok(err)) {
