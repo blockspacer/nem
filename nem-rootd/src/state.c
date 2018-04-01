@@ -11,6 +11,7 @@
 static bool is_init = false;
 static bool is_root = false;
 static int verbose = 0;
+static int capsicum = 0;
 static int reload = 0;
 static char *rootd_path = NULL;
 static char *routerd_path = NULL;
@@ -19,14 +20,16 @@ static char *jail_root = NULL;
 enum {
 	OPT_VERBOSE,
 	OPT_RELOAD,
+	OPT_CAPSICUM,
 	OPT_ROUTERD_PATH,
 	OPT_JAIL_ROOT,
 };
 static struct option longopts[] = {
-	{ "verbose",   optional_argument, &verbose, 'v' },
-	{ "reload",    optional_argument, &reload,   0  },
-	{ "routerd",   optional_argument, NULL,      0  },
-	{ "jail-root", optional_argument, NULL,      0  },
+	{ "verbose",   optional_argument, &verbose,  'v' },
+	{ "reload",    optional_argument, &reload,    0  },
+	{ "capsicum",  optional_argument, &capsicum, 'c' },
+	{ "routerd",   optional_argument, NULL,       0  },
+	{ "jail-root", optional_argument, NULL,       0  },
 	{ 0 },
 };
 
@@ -37,6 +40,7 @@ usage()
 		"Usage: %s\n"
 		"  --verbose, -v:    be noisy\n"
 		"  --reload:         internal usage\n"
+		"  --capsicum:       enable capsicum\n"
 		"  --routerd=path:   set path to nem-routerd\n"
 		"  --jail-root=path: set path to jail root dir\n",
 		rootd_path
@@ -68,6 +72,7 @@ parse_options(int argc, char *argv[])
 	while (-1 != (ch = getopt_long(argc, argv, "vr0", longopts, &idx))) {
 		switch (ch) {
 			case 'v':
+			case 'c':
 			case 0: 
 				break;
 			default:
@@ -77,6 +82,9 @@ parse_options(int argc, char *argv[])
 		switch (idx) {
 			case OPT_VERBOSE:
 				verbose = 1;
+				break;
+			case OPT_CAPSICUM:
+				capsicum = 1;
 				break;
 			case OPT_RELOAD:
 				reload = 1;
@@ -218,6 +226,12 @@ NEM_rootd_verbose()
 	return verbose;
 }
 
+bool
+NEM_rootd_capsicum()
+{
+	return capsicum;
+}
+
 const char*
 NEM_rootd_routerd_path()
 {
@@ -229,3 +243,4 @@ NEM_rootd_jail_root()
 {
 	return jail_root;
 }
+

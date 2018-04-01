@@ -12,12 +12,18 @@ on_msg(NEM_thunk_t *thunk, void *varg)
 	NEM_panic_if_err(ca->err);
 	NEM_app_t *app = NEM_thunk_ptr(thunk);
 
+	char with_fd[30] = {0};
+	if (ca->msg->packed.flags & NEM_PMSGFLAG_FD) {
+		snprintf(with_fd, sizeof(with_fd), "fd=%d ", ca->msg->fd);
+	}
+
 	NEM_msg_t *res;
 	printf(
-		"[child] got command %s/%s %hu (seq=%lu)\n",
+		"[child] got command %s/%s %hu %s(seq=%lu)\n",
 		NEM_svcid_to_string(ca->msg->packed.service_id),
 		NEM_cmdid_to_string(ca->msg->packed.service_id, ca->msg->packed.command_id),
 		ca->msg->packed.command_id,
+		with_fd,
 		ca->msg->packed.seq
 	);
 

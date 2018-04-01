@@ -97,6 +97,15 @@ on_child_died(NEM_thunk1_t *thunk, void *varg)
 }
 
 static void
+on_child_silenced(NEM_thunk1_t *thunk, void *varg)
+{
+	if (is_running) {
+		// An obstinant child must be punished with due haste.
+		NEM_child_stop(&child);
+	}
+}
+
+static void
 routerd_dispatch(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_chan_ca *ca = varg;
@@ -149,6 +158,10 @@ routerd_enter(NEM_thunk1_t *thunk, void *varg)
 			printf("dup2: %s\n", strerror(errno));
 			return;
 		}
+	}
+
+	if (!NEM_rootd_capsicum()) {
+		return;
 	}
 
 	if (0 != cap_enter()) {
@@ -338,6 +351,11 @@ routerd_start(NEM_app_t *app)
 		NEM_child_free(&child);
 		return err;
 	}
+
+	NEM_chan_on_close(&child.chan, NEM_thunk1_new_ptr(
+		&on_child_silenced,
+		app)
+	);
 
 	NEM_rootd_txnmgr_init(&txnmgr, &child.chan, NEM_thunk_new_ptr(
 		&routerd_dispatch,

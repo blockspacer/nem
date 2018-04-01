@@ -446,19 +446,43 @@ NEM_fd_write(NEM_fd_t *this, void *buf, size_t len, NEM_thunk1_t *cb)
 NEM_err_t
 NEM_fd_read_fd(NEM_fd_t *this, int *fdout)
 {
+	if (NULL != this->on_read) {
+		return NEM_err_static("NEM_fd_read_fd: interleaved with read");
+	}
+
 	size_t len = CMSG_SPACE(sizeof(*fdout));
 	char *buf = alloca(len);
 
+	// NB: Doing stupid garbage here to support runtimes that support
+	// platforms that are garbage and can't read OOB data without ripping
+	// into the actual data stream. fml.
+	char discard = 0;
+	struct iovec iov = {
+		.iov_len  = 1,
+		.iov_base = &discard,
+	};
 	struct msghdr msg = {
 		.msg_control    = buf,
 		.msg_controllen = len,
+		.msg_iov        = &iov,
+		.msg_iovlen     = 1,
 	};
 
 	if (-1 == recvmsg(this->fd_in, &msg, MSG_CMSG_CLOEXEC)) {
 		return NEM_err_errno();
 	}
+	if (this->ravail > 0) {
+		this->ravail -= 1;
+	}
+
+	if ('F' != discard) {
+		return NEM_err_static("NEM_fd_read_fd: didn't get 'F'd");
+	}
 
 	struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+	if (NULL == cmsg) {
+		return NEM_err_static("NEM_fd_read_fd: CMSG_FIRSTHDR returned NULL");
+	}
 	if (SOL_SOCKET != cmsg->cmsg_level) {
 		return NEM_err_static("NEM_fd_read_fd: cmsg_level");
 	}
@@ -483,13 +507,27 @@ NEM_fd_read_fd(NEM_fd_t *this, int *fdout)
 NEM_err_t
 NEM_fd_write_fd(NEM_fd_t *this, int fd)
 {
+	if (NULL != this->on_write) {
+		return NEM_err_static("NEM_fd_write_fd: interleaved with write");
+	}
+
 	size_t len = CMSG_SPACE(sizeof(fd));
 	char *buf = alloca(len);
 	bzero(buf, len);
 
+	// NB: Go's fucking syscall.Recvmsg eats a goddamn byte from the not-OOB
+	// stream for some fucking reason. So put a fucking byte in there because
+	// holy shit what the flying fuck.
+	char discard = 'F';
+	struct iovec iov = {
+		.iov_len  = 1,
+		.iov_base = &discard,
+	};
 	struct msghdr msg = {
 		.msg_control    = buf,
 		.msg_controllen = len,
+		.msg_iov        = &iov,
+		.msg_iovlen     = 1,
 	};
 
 	struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);

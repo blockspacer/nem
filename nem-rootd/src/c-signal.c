@@ -14,8 +14,9 @@ sig_to_string(int sig)
 		const char *str;
 	}
 	table[] = {
-		{ SIGINT,  "SIGINT" },
+		{ SIGINT,  "SIGINT"  },
 		{ SIGQUIT, "SIGQUIT" },
+		{ SIGPIPE, "SIGPIPE" },
 	};
 
 	for (size_t i = 0; i < NEM_ARRSIZE(table); i += 1) {
@@ -31,6 +32,11 @@ static void
 on_kevent(NEM_thunk_t *thunk, void *varg)
 {
 	struct kevent *kev = varg;
+
+	if (kev->ident == SIGPIPE) {
+		printf("c-signal: got SIGPIPE?\n");
+		return;
+	}
 
 	if (NEM_rootd_verbose()) {
 		printf(
@@ -48,6 +54,7 @@ setup(NEM_app_t *app)
 	int sigs[] = {
 		SIGINT,
 		SIGQUIT,
+		SIGPIPE,
 	};
 
 	if (NEM_rootd_verbose()) {

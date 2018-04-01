@@ -27,6 +27,8 @@ main(int argc, char *argv[])
 	NEM_rootd_add_comp(&NEM_rootd_c_jails);
 
 	NEM_panic_if_err(NEM_rootd_routerd_bind_http(3000));
+	NEM_panic_if_err(NEM_rootd_routerd_bind_http(3001));
+	NEM_panic_if_err(NEM_rootd_routerd_bind_http(3002));
 
 	NEM_err_t err = NEM_rootd_main(argc, argv);
 	if (!NEM_err_ok(err)) {
