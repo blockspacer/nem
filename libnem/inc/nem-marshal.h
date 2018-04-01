@@ -52,6 +52,7 @@ static const int NEM_MARSHAL_ARRAY    = 64; // struct*+size_t, heap-allocated
 // during marshalling if the value is NULL). It cannot be combined with
 // NEM_MARSHAL_ARRAY.
 static const int NEM_MARSHAL_PTR      = 128; // type*, heap-allocated
+static const int NEM_MARSHAL_STRUCTPTR = NEM_MARSHAL_PTR|NEM_MARSHAL_STRUCT;
 
 typedef struct NEM_marshal_field_t NEM_marshal_field_t;
 typedef struct NEM_marshal_map_t NEM_marshal_map_t;

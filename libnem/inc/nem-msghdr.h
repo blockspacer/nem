@@ -5,6 +5,7 @@ typedef struct {
 	const char *reason;
 }
 NEM_msghdr_err_t;
+extern const NEM_marshal_map_t NEM_msghdr_err_m;
 
 typedef struct {
 	const char *cluster;
@@ -13,6 +14,7 @@ typedef struct {
 	const char *obj;
 }
 NEM_msghdr_route_t;
+extern const NEM_marshal_map_t NEM_msghdr_route_m;
 
 typedef struct {
 	NEM_msghdr_err_t   *err;
@@ -20,6 +22,7 @@ typedef struct {
 	NEM_ALIGN char data[];
 }
 NEM_msghdr_t;
+extern const NEM_marshal_map_t NEM_msghdr_m;
 
 NEM_err_t NEM_msghdr_new(NEM_msghdr_t **hdr, const void *bs, size_t len);
 NEM_err_t NEM_msghdr_pack(NEM_msghdr_t *hdr, void **bs, size_t *len);
