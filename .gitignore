@@ -4,3 +4,4 @@ obj
 *.core
 /vgcore.*
 /nem-rootd/jails
+/certs/data

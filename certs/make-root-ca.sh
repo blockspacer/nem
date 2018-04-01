@@ -1,7 +1,6 @@
 #!/bin/sh
 set -e 
 
-cd `dirname $0`
 HOST=$1
 
 if [ -z "$HOST" ] ; then
@@ -19,7 +18,7 @@ chmod 700 "$HOST/private"
 touch "$HOST/index.txt"
 echo 1000 > "$HOST/serial"
 
-./make-openssl-config.sh "$HOST" "ca" "policy_strict"
+`dirname $0`/make-openssl-config.sh "$HOST" "ca" "policy_strict"
 
 openssl genrsa -out "$HOST/private/ca.key.pem" 4096
 chmod 400 "$HOST/private/ca.key.pem"

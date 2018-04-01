@@ -1,7 +1,6 @@
 #!/bin/sh
 set -e
 
-cd `dirname $0`
 HOST=$1
 CA=$2
 
@@ -25,7 +24,7 @@ touch "$HOST/index.txt"
 echo 1000 > "$HOST/serial"
 echo 1000 > "$HOST/crlnumber"
 
-./make-openssl-config.sh "$HOST" "cluster" "policy_loose"
+`dirname $0`/make-openssl-config.sh "$HOST" "cluster" "policy_loose"
 
 openssl genrsa -out "$HOST/private/cluster.key.pem" 4096
 chmod 400 "$HOST/private/cluster.key.pem"
