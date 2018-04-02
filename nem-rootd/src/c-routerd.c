@@ -295,6 +295,9 @@ NEM_rootd_routerd_bind_http(int port)
 	addr.sin_addr.s_addr = INADDR_ANY;
 	if (-1 == bind(fd, (struct sockaddr*) &addr, sizeof(addr))) {
 		close(fd);
+		if (NEM_rootd_verbose()) {
+			printf("c-routerd: unable to bind port %d\n", port);
+		}
 		return NEM_err_errno();
 	}
 	

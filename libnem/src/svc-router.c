@@ -35,7 +35,6 @@ const NEM_marshal_map_t NEM_svc_router_register_svc_m = {
 
 #define TYPE NEM_svc_router_register_http_t
 static const NEM_marshal_field_t router_register_http_fs[] = {
-	{ "port", NEM_MARSHAL_INT32,  O(port), -1, NULL },
 	{ "host", NEM_MARSHAL_STRING, O(host), -1, NULL },
 	{ "base", NEM_MARSHAL_STRING, O(base), -1, NULL },
 	{ "inst", NEM_MARSHAL_STRING, O(inst), -1, NULL },
