@@ -37,6 +37,4 @@
 #include "nem-app.h"
 #include "nem-child.h"
 #include "nem-services.h"
-
-extern char *NEM_root_cert_pem;
-extern size_t *NEM_root_cert_pem_len;
+#include "nem-rootcert.h"

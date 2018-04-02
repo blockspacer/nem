@@ -39,7 +39,18 @@ BUILD_FLAGS="
 mkdir -p bin
 mkdir -p obj
 
-rm -f obj/*.o
+for f in obj/* ; do
+	if [ "$f" != "obj/rootcert_raw.o" ] ; then
+		rm -f "$f"
+	fi
+done
+
+if [ \! -f obj/rootcert_raw.o ] ; then
+	echo "Missing rootcert_raw.o; generate with obj_cert.sh"
+	exit 1
+fi
+
+OBJ_FILES="$OBJ_FILES obj/rootcert_raw.o"
 
 for C_FILE in src/*.c ; do
 	OBJ_FILE=`echo $C_FILE | sed -e 's#\.c$#.o#' | sed -e 's#^src/#obj/#'`
