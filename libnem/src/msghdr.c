@@ -32,8 +32,10 @@ NEM_msghdr_new(NEM_msghdr_t **out, const void *bs, size_t len)
 void
 NEM_msghdr_free(NEM_msghdr_t *hdr)
 {
-	NEM_unmarshal_free(&NEM_msghdr_m, hdr, sizeof(*hdr));
-	free(hdr);
+	if (NULL != hdr) {
+		NEM_unmarshal_free(&NEM_msghdr_m, hdr, sizeof(*hdr));
+		free(hdr);
+	}
 }
 
 NEM_err_t

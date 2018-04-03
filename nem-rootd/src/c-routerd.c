@@ -215,6 +215,7 @@ routerd_send_port_cb(NEM_thunk1_t *thunk, void *varg)
 {
 	NEM_rootd_txn_ca *ca = varg;
 	port_t *port = NEM_thunk1_inlineptr(thunk);
+	NEM_msghdr_t *hdr = NEM_msg_header(ca->msg);
 
 	if (NEM_rootd_verbose()) {
 		if (!NEM_err_ok(ca->err)) {
@@ -224,10 +225,19 @@ routerd_send_port_cb(NEM_thunk1_t *thunk, void *varg)
 				NEM_err_string(ca->err)
 			);
 		}
+		else if (NULL != hdr && NULL != hdr->err) {
+			printf(
+				"c-routerd: error sending port %d: %s\n",
+				port->port,
+				hdr->err->reason ? hdr->err->reason : "(no reason)"
+			);
+		}
 		else {
 			printf("c-routerd: sent port %d\n", port->port);
 		}
 	}
+
+	NEM_msghdr_free(hdr);
 }
 
 static void

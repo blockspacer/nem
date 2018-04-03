@@ -7,10 +7,11 @@
 
 #define TYPE NEM_svc_router_bind_t
 static const NEM_marshal_field_t router_bind_fs[] = {
-	{ "port",     NEM_MARSHAL_INT32,  O(port),     -1, NULL },
-	{ "proto",    NEM_MARSHAL_STRING, O(proto),    -1, NULL },
-	{ "cert_pem", NEM_MARSHAL_STRING, O(cert_pem), -1, NULL },
-	{ "key_pem",  NEM_MARSHAL_STRING, O(key_pem),  -1, NULL },
+	{ "port",          NEM_MARSHAL_INT32,  O(port),          -1, NULL },
+	{ "proto",         NEM_MARSHAL_STRING, O(proto),         -1, NULL },
+	{ "cert_pem",      NEM_MARSHAL_STRING, O(cert_pem),      -1, NULL },
+	{ "key_pem",       NEM_MARSHAL_STRING, O(key_pem),       -1, NULL },
+	{ "client_ca_pem", NEM_MARSHAL_STRING, O(client_ca_pem), -1, NULL },
 };
 const NEM_marshal_map_t NEM_svc_router_bind_m = {
 	.fields     = router_bind_fs,

@@ -117,6 +117,19 @@ NEM_msg_set_header(NEM_msg_t *this, NEM_msghdr_t *hdr)
 	return err;
 }
 
+NEM_msghdr_t*
+NEM_msg_header(const NEM_msg_t *this)
+{
+	NEM_msghdr_t *hdr = NULL;
+
+	NEM_err_t err = NEM_msghdr_new(&hdr, this->header, this->packed.header_len);
+	if (!NEM_err_ok(err)) {
+		return NULL;
+	}
+
+	return hdr;
+}
+
 NEM_err_t
 NEM_msg_set_body(NEM_msg_t *this, void *body, size_t len)
 {

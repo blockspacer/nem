@@ -97,6 +97,10 @@ NEM_err_t NEM_msg_set_header_raw(NEM_msg_t *this, void *header, size_t len);
 // it to the message.
 NEM_err_t NEM_msg_set_header(NEM_msg_t *this, NEM_msghdr_t *hdr);
 
+// NEM_msg_header returns the NEM_msghdr_t contained by the message. The
+// returned value should be freed with NEM_msghdr_free after use.
+NEM_msghdr_t *NEM_msg_header(const NEM_msg_t *this);
+
 // NEM_msg_set_body does the same thing as NEM_msg_set_header, but with
 // a different field.
 NEM_err_t NEM_msg_set_body(NEM_msg_t *this, void *body, size_t len);
