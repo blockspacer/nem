@@ -60,6 +60,9 @@ NEM_msg_new_reply(NEM_msg_t *msg, size_t hlen, size_t blen)
 void
 NEM_msg_free(NEM_msg_t *this)
 {
+	if (NULL == this) {
+		return;
+	}
 	if (!(this->flags & NEM_MSGFLAG_HEADER_INLINE)) {
 		free(this->header);
 	}

@@ -61,6 +61,7 @@ NEM_msg_t;
 // probably be implemented with SLIST macros but I am lazy or something.
 typedef struct NEM_msglist_t {
 	NEM_msg_t *msg;
+	NEM_thunk1_t *thunk;
 	struct NEM_msglist_t *next;
 }
 NEM_msglist_t;

@@ -48,7 +48,7 @@ on_msg(NEM_thunk_t *thunk, void *varg)
 			NEM_panicf("invalid command %d", ca->msg->packed.command_id);
 	}
 
-	NEM_chan_send(app->chan, res);
+	NEM_chan_send(app->chan, res, NULL);
 }
 
 int

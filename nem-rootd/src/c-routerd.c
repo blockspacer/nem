@@ -137,7 +137,7 @@ routerd_dispatch(NEM_thunk_t *thunk, void *varg)
 		};
 		NEM_msg_t *reply = NEM_msg_new_reply(ca->msg, 0, 0);
 		NEM_msg_set_header(reply, &hdr);
-		NEM_chan_send(ca->chan, reply);
+		NEM_chan_send(ca->chan, reply, NULL);
 	}
 }
 

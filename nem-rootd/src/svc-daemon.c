@@ -17,7 +17,7 @@ svc_daemon_info(NEM_thunk_t *thunk, void *varg)
 
 	NEM_msg_t *msg = NEM_msg_new_reply(ca->msg, 0, 6);
 	snprintf(msg->body, 6, "hello");
-	NEM_chan_send(ca->chan, msg);
+	NEM_chan_send(ca->chan, msg, NULL);
 }
 
 static void

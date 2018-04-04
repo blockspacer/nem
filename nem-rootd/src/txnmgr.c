@@ -46,7 +46,7 @@ NEM_rootd_cancel_incoming(NEM_rootd_txnmgr_t *this, NEM_msg_t *inc)
 	// incoming request, not sure how those semantics are going to work yet.
 	// XXX: Want to put an error message in the header, but the header wire
 	// format isn't sorted out yet.
-	NEM_chan_send(this->chan, cancel);
+	NEM_chan_send(this->chan, cancel, NULL);
 }
 
 static void
@@ -191,5 +191,5 @@ NEM_rootd_txnmgr_req1(
 		);
 	}
 
-	NEM_chan_send(this->chan, msg);
+	NEM_chan_send(this->chan, msg, NULL);
 }

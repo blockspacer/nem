@@ -18,8 +18,8 @@ typedef struct {
 	NEM_thunk_t  *on_msg;
 	NEM_thunk1_t *on_close;
 
-	NEM_msg_t     *wmsg;
 	NEM_msglist_t *wqueue;
+	NEM_msglist_t *wlast;
 
 	NEM_pmsg_t pmsg;
 	NEM_msg_t *rmsg;
@@ -51,10 +51,11 @@ void NEM_chan_init(NEM_chan_t *this, NEM_stream_t stream);
 void NEM_chan_free(NEM_chan_t *this);
 
 // NEM_chan_send assumes ownership of the heap-allocated msg object and
-// sends it across the network.
-// XXX: This should be adapted to take a callback for when the message
-// is finally sent.
-void NEM_chan_send(NEM_chan_t *this, NEM_msg_t *msg);
+// sends it across the network. If cb is non-null, it is called when
+// the message is sent across the wire. The cb is passed a NEM_chan_ca
+// and may NULL the msg field if it wants to assume ownership of the
+// message.
+void NEM_chan_send(NEM_chan_t *this, NEM_msg_t *msg, NEM_thunk1_t *cb);
 
 // NEM_chan_on_msg sets a singluar callback to invoke when a message is
 // received from the channel. The message is freed after the callback

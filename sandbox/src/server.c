@@ -27,7 +27,7 @@ on_child_msg(NEM_thunk_t *thunk, void *varg)
 			msg->packed.seq = 2;
 			msg->packed.service_id = NEM_svcid_daemon;
 			msg->packed.command_id = NEM_cmdid_daemon_stop;
-			NEM_chan_send(&child->chan, msg);
+			NEM_chan_send(&child->chan, msg, NULL);
 			break;
 		}
 		case 2:
@@ -64,7 +64,7 @@ main(int argc, char *argv[])
 	msg->packed.command_id = NEM_cmdid_daemon_info;
 	msg->packed.seq = 1;
 
-	NEM_chan_send(&child.chan, msg);
+	NEM_chan_send(&child.chan, msg, NULL);
 
 	NEM_panic_if_err(NEM_app_run(&app));
 	NEM_child_free(&child);
