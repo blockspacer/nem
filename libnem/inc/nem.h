@@ -37,5 +37,6 @@
 #include "nem-app.h"
 #include "nem-child.h"
 #include "nem-services.h"
+#include "nem-svcmux.h"
 #include "nem-txnmgr.h"
 #include "nem-rootcert.h"
