@@ -3,16 +3,25 @@
 typedef struct NEM_txnmgr_t NEM_txnmgr_t;
 typedef struct NEM_txn_t NEM_txn_t;
 
+typedef enum {
+	NEM_TXN_IN,
+	NEM_TXN_OUT,
+}
+NEM_txntype_t;
+
 // NEM_txn_t represents a transaction. A transaction encapsulates the data
 // around a set of messages -- either incoming or outgoing. Transactions
 // are hierarchical -- they can be bound to a parent transaction -- so that
 // cancelling the parent transaction propagates down to all children.
 struct NEM_txn_t {
 	uint64_t       seq;
+	struct timeval timeout;
+	NEM_txntype_t  type;
 
 	size_t        children_len;
 	NEM_txn_t   **children;
 	NEM_txnmgr_t *mgr;
+	void         *data;
 
 	size_t        messages_len;
 	NEM_msg_t   **messsages;
@@ -35,38 +44,40 @@ NEM_txnin_t;
 // request.
 typedef struct NEM_txnout_t {
 	NEM_txn_t                 base;
-	struct timeval            timeout;
 	SPLAY_ENTRY(NEM_txnout_t) link;
 }
 NEM_txnout_t;
 
 // NEM_txn_data returns the data pointer previously set by NEM_txn_set_data.
-void *NEM_txn_data(NEM_txn_t *txn);
+void *NEM_txn_data(NEM_txn_t *this);
 
 // NEM_txn_set_data binds arbitrary data with this NEM_txn_t. The data can
 // be retrieved with NEM_txn_data.
-void NEM_txn_set_data(NEM_txn_t *txn, void *data);
+void NEM_txn_set_data(NEM_txn_t *this, void *data);
 
 // NEM_txn_cancel aborts the entire transaction, removing it and every
 // child transaction from their respective managers. This invalidates the
 // transaction object. For outgoing transactions, this invokes the callback
 // before freeing the transaction.
-void NEM_txn_cancel(NEM_txn_t *txn);
+void NEM_txn_cancel(NEM_txn_t *this);
+void NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err);
 
 // NEM_txnout_set_timeout sets the timeout in seconds for this transaction. Once
 // the period is expired, the transaction (and all children) are automatically
 // cancelled. This should be set on the top-level transaction -- when children
 // transactions are associated they make a copy of the parent's absolute
 // timeout value.
-void NEM_txnout_set_timeout(NEM_txn_t *txn, int seconds);
+// 
+// Setting -1 seconds makes the timeout infinite.
+void NEM_txnout_set_timeout(NEM_txnout_t *this, int seconds);
 
 // NEM_txnin_reply finalizes the transaction and sends the provided message.
 // This invalidates the transaction object.
-void NEM_txnin_reply(NEM_txn_t *txn, NEM_msg_t *msg);
+void NEM_txnin_reply(NEM_txnin_t *this, NEM_msg_t *msg);
 
 // NEM_txnin_reply_continue sends a message without invalidating the
 // transaction object.
-void NEM_txnin_reply_continue(NEM_txn_t *txn, NEM_msg_t *msg);
+void NEM_txnin_reply_continue(NEM_txnin_t *this, NEM_msg_t *msg);
 
 // NEM_txntree_t is a tree of transactions, ordered by seqid.
 typedef SPLAY_HEAD(NEM_txnin_tree_t, NEM_txnin_t) NEM_txnin_tree_t;
@@ -122,37 +133,37 @@ NEM_txn_ca;
 //
 
 static inline void*
-NEM_txnin_data(NEM_txnin_t *txn)
+NEM_txnin_data(NEM_txnin_t *this)
 {
-	return NEM_txn_data(&txn->base);
+	return NEM_txn_data(&this->base);
 }
 
 static inline void*
-NEM_txnout_data(NEM_txnout_t *txn)
+NEM_txnout_data(NEM_txnout_t *this)
 {
-	return NEM_txn_data(&txn->base);
+	return NEM_txn_data(&this->base);
 }
 
 static inline void
-NEM_txnin_set_data(NEM_txnin_t *txn, void *data)
+NEM_txnin_set_data(NEM_txnin_t *this, void *data)
 {
-	return NEM_txn_set_data(&txn->base, data);
+	return NEM_txn_set_data(&this->base, data);
 }
 
 static inline void
-NEM_txnout_set_data(NEM_txnout_t *txn, void *data)
+NEM_txnout_set_data(NEM_txnout_t *this, void *data)
 {
-	return NEM_txn_set_data(&txn->base, data);
+	return NEM_txn_set_data(&this->base, data);
 }
 
 static inline void
-NEM_txnin_cancel(NEM_txnin_t *txn)
+NEM_txnin_cancel(NEM_txnin_t *this)
 {
-	return NEM_txn_cancel(&txn->base);
+	return NEM_txn_cancel(&this->base);
 }
 
 static inline void
-NEM_txnout_cancel(NEM_txnout_t *txn)
+NEM_txnout_cancel(NEM_txnout_t *this)
 {
-	return NEM_txn_cancel(&txn->base);
+	return NEM_txn_cancel(&this->base);
 }
