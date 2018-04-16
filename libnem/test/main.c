@@ -17,6 +17,7 @@ extern Suite
 	*suite_dial(),
 	*suite_chan(),
 	*suite_svcmux(),
+	*suite_txnmgr(),
 	*suite_rootcert();
 
 static suite_def suites[] = {
@@ -34,6 +35,7 @@ static suite_def suites[] = {
 	&suite_dial,
 	&suite_chan,
 	&suite_svcmux,
+	&suite_txnmgr,
 	&suite_rootcert,
 };
 
