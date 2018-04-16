@@ -101,6 +101,21 @@ NEM_txnin_reply(NEM_txnin_t *this, NEM_msg_t *msg)
 }
 
 void
+NEM_txnin_reply_err(NEM_txnin_t *this, NEM_err_t err)
+{
+	NEM_msghdr_err_t hdrerr = {
+		.code   = 1,
+		.reason = NEM_err_string(err),
+	};
+	NEM_msghdr_t hdr = {
+		.err = &hdrerr,
+	};
+	NEM_msg_t *msg = NEM_msg_new(0, 0); 
+	NEM_msg_set_header(msg, &hdr);
+	NEM_txnin_reply(this, msg);
+}
+
+void
 NEM_txnin_reply_continue(NEM_txnin_t *this, NEM_msg_t *msg)
 {
 	msg->packed.flags |= NEM_PMSGFLAG_CONTINUE;

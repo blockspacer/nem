@@ -75,6 +75,9 @@ void NEM_txnout_set_timeout(NEM_txnout_t *this, int seconds);
 // This invalidates the transaction object.
 void NEM_txnin_reply(NEM_txnin_t *this, NEM_msg_t *msg);
 
+// NEM_txnin_reply_err finalizes the transaction and sends the error.
+void NEM_txnin_reply_err(NEM_txnin_t *this, NEM_err_t err);
+
 // NEM_txnin_reply_continue sends a message without invalidating the
 // transaction object.
 void NEM_txnin_reply_continue(NEM_txnin_t *this, NEM_msg_t *msg);
