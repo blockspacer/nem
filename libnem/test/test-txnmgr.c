@@ -5,7 +5,7 @@ typedef struct {
 	NEM_fd_t fd_1, fd_2;
 	NEM_txnmgr_t t_1, t_2;
 	NEM_svcmux_t svc_1, svc_2;
-	int ctr;
+	int ctr, ctr2;
 }
 work_t;
 
@@ -22,6 +22,7 @@ work_svc_1_1(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_txn_ca *ca = varg;
 	work_t *work = NEM_thunk_ptr(thunk);
+	work->ctr += 10;
 
 	ck_err(ca->err);
 	ck_assert_ptr_ne(NULL, ca->msg);
@@ -32,7 +33,6 @@ work_svc_1_1(NEM_thunk_t *thunk, void *varg)
 	NEM_msg_t *msg = NEM_msg_new_reply(ca->msg, 0, 6);
 	memcpy(msg->body, "hello", 6);
 	NEM_txnin_reply(ca->txnin, msg);
-	work->ctr += 10;
 }
 
 static void
@@ -40,6 +40,7 @@ work_svc_1_2(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_txn_ca *ca = varg;
 	work_t *work = NEM_thunk_ptr(thunk);
+	work->ctr += 100;
 
 	ck_err(ca->err);
 	ck_assert_ptr_ne(NULL, ca->msg);
@@ -53,14 +54,14 @@ work_svc_1_2(NEM_thunk_t *thunk, void *varg)
 
 	NEM_txnin_reply_continue(ca->txnin, msg1);
 	NEM_txnin_reply(ca->txnin, msg2);
-	work->ctr += 100;
 }
 
 static void
-work_svc_2_1(NEM_thunk_t *thunk, void *varg)
+work_svc_2_3(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_txn_ca *ca = varg;
 	work_t *work = NEM_thunk_ptr(thunk);
+	work->ctr += 1000;
 
 	ck_err(ca->err);
 	ck_assert_ptr_ne(NULL, ca->msg);
@@ -69,7 +70,6 @@ work_svc_2_1(NEM_thunk_t *thunk, void *varg)
 	ck_assert(ca->done);
 
 	NEM_txnin_reply_err(ca->txnin, NEM_err_static("hurr"));
-	work->ctr += 1000;
 }
 
 static void
@@ -93,7 +93,7 @@ work_init(work_t *work)
 		{ 1, 2, NEM_thunk_new_ptr(&work_svc_1_2, work) },
 	};
 	NEM_svcmux_entry_t svcs_2[] = {
-		{ 2, 1, NEM_thunk_new_ptr(&work_svc_2_1, work) },
+		{ 2, 1, NEM_thunk_new_ptr(&work_svc_2_3, work) },
 	};
 
 	NEM_svcmux_init(&work->svc_1);
@@ -141,6 +141,7 @@ send_recv_1_1_cb(NEM_thunk_t *thunk, void *varg)
 	ck_assert_str_eq("hello", ca->msg->body);
 	// NB: The message is automatically freed here.
 
+	work->ctr2 += 1;
 	NEM_app_stop(&work->app);
 }
 
@@ -160,6 +161,92 @@ START_TEST(send_recv_1_1)
 
 	ck_err(NEM_app_run(&work.app));
 	ck_assert_int_eq(work.ctr, 10);
+	ck_assert_int_eq(work.ctr2, 1);
+	work_free(&work);
+}
+END_TEST
+
+static void
+send_recv_1_2_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_txn_ca *ca = varg;
+
+	ck_err(ca->err);
+	ck_assert_ptr_ne(NULL, ca->txnout);
+	ck_assert_ptr_eq(NULL, ca->txnin);
+	ck_assert_ptr_ne(NULL, ca->msg);
+
+	if (0 == work->ctr2) {
+		ck_assert_int_eq(0, ca->msg->packed.body_len);
+		ck_assert_int_eq(0, ca->msg->packed.header_len);
+	}
+	else if (1 == work->ctr2) {
+		ck_assert_int_eq(6, ca->msg->packed.body_len);
+		ck_assert_int_eq(0, ca->msg->packed.header_len);
+		ck_assert_str_eq("world", ca->msg->body);
+		ck_assert(ca->done);
+		NEM_app_stop(&work->app);
+	}
+
+	work->ctr2 += 1;
+}
+
+START_TEST(send_recv_1_2)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
+	msg->packed.service_id = 1;
+	msg->packed.command_id = 2;
+
+	NEM_txnmgr_req1(&work.t_2, NULL, msg, NEM_thunk_new_ptr(
+		&send_recv_1_2_cb,
+		&work
+	));
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(work.ctr, 100);
+	ck_assert_int_eq(work.ctr2, 2);
+	work_free(&work);
+}
+END_TEST
+
+static void
+err_fd_closed_clisend_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_txn_ca *ca = varg;
+	ck_assert(!NEM_err_ok(ca->err));
+	ck_assert_ptr_eq(NULL, ca->txnin);
+	ck_assert_ptr_ne(NULL, ca->txnout);
+	ck_assert_int_eq(0, ca->txnout->base.messages_len);
+	ck_assert_ptr_eq(NULL, ca->msg);
+	ck_assert(ca->done);
+	work->ctr2 += 1;
+	NEM_app_stop(&work->app);
+}
+
+START_TEST(err_fd_closed_clisend)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
+	msg->packed.service_id = 1;
+	msg->packed.command_id = 1;
+
+	NEM_fd_close(&work.fd_1);
+
+	NEM_txnmgr_req1(&work.t_2, NULL, msg, NEM_thunk_new_ptr(
+		&err_fd_closed_clisend_cb,
+		&work
+	));
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(work.ctr, 0);
+	ck_assert_int_eq(work.ctr2, 1);
 	work_free(&work);
 }
 END_TEST
@@ -168,8 +255,10 @@ Suite*
 suite_txnmgr()
 {
 	tcase_t tests[] = {
-		{ "scaffolding",   &scaffolding   },
-		{ "send_recv_1_1", &send_recv_1_1 },
+		{ "scaffolding",           &scaffolding           },
+		{ "send_recv_1_1",         &send_recv_1_1         },
+		{ "send_recv_1_2",         &send_recv_1_2         },
+		{ "err_fd_closed_clisend", &err_fd_closed_clisend },
 	};
 
 	return tcase_build_suite("txnmgr", tests, sizeof(tests));

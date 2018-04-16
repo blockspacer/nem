@@ -102,7 +102,6 @@ NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err)
 	};
 	if (NULL != this->thunk) {
 		NEM_thunk_invoke(this->thunk, &ca);
-		NEM_thunk_free(this->thunk);
 	}
 
 	NEM_txn_free(this);

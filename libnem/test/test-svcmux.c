@@ -82,6 +82,21 @@ START_TEST(override_null)
 }
 END_TEST
 
+START_TEST(copy)
+{
+	NEM_svcmux_entry_t entries[] = {
+		{ 1, 1, NEM_thunk_new(NULL, 0) },
+	};
+
+	NEM_svcmux_t mux;
+	NEM_svcmux_init(&mux);
+	NEM_svcmux_add_handlers(&mux, entries, NEM_ARRSIZE(entries));
+	ck_assert_ptr_eq(&mux, NEM_svcmux_copy(&mux));
+	NEM_svcmux_decref(&mux);
+	NEM_svcmux_decref(&mux);
+}
+END_TEST
+
 Suite*
 suite_svcmux()
 {
@@ -90,6 +105,7 @@ suite_svcmux()
 		{ "add_resolve",   &add_resolve   },
 		{ "override",      &override      },
 		{ "override_null", &override_null },
+		{ "copy",          &copy          },
 	};
 
 	return tcase_build_suite("svcmux", tests, sizeof(tests));
