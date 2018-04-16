@@ -102,8 +102,20 @@ NEM_thunk_inlineptr(NEM_thunk_t *this)
 
 // NEM_thunk1_invoke invokes the wrapped function and immediately discards
 // (i.e., free's) the provided NEM_thunk1_t.
-void NEM_thunk1_invoke(NEM_thunk1_t **this, void *data);
-void NEM_thunk_invoke(NEM_thunk_t *this, void *data);
+#define NEM_thunk1_invoke(vthis, vdata) {\
+	NEM_thunk1_t **NEM_THUNK_this = (vthis); \
+	void *NEM_THUNK_data = (vdata); \
+	NEM_thunk1_t *NEM_THUNK_copy = *NEM_THUNK_this; \
+	*NEM_THUNK_this = NULL; \
+	NEM_THUNK_copy->fn(NEM_THUNK_copy, NEM_THUNK_data); \
+	free(NEM_THUNK_copy); \
+}
+
+#define NEM_thunk_invoke(vthis, vdata) {\
+	NEM_thunk_t *NEM_THUNK_this = (vthis); \
+	void *NEM_THUNK_data = (vdata); \
+	NEM_THUNK_this->fn(NEM_THUNK_this, NEM_THUNK_data); \
+}
 
 // NEM_thunk1_discard free's the NEM_thunk1_t without invocation.
 void NEM_thunk1_discard(NEM_thunk1_t **this);

@@ -47,26 +47,6 @@ NEM_thunk_ptr(NEM_thunk_t *this)
 }
 
 void
-NEM_thunk1_invoke(NEM_thunk1_t **this, void *data)
-{
-	// IMPORTANT NOTE: The thunk may invoke something that _also_ attempts to
-	// free this thunk (via NEM_thunk1_discard), so grab a copy of the pointer
-	// and NULL out the source before calling the method with the copy. The
-	// method may refer to the thunk (because we're holding data for it) so
-	// don't free until _after_ running the block.
-	NEM_thunk1_t *copy = *this;
-	*this = NULL;
-	copy->fn(copy, data);
-	free(copy);
-}
-void
-NEM_thunk_invoke(NEM_thunk_t *this, void *data)
-{
-	// Hurr easy peasey since we don't have to freesey.
-	this->fn(this, data);
-}
-
-void
 NEM_thunk1_discard(NEM_thunk1_t **this)
 {
 	if (NULL == *this) {
