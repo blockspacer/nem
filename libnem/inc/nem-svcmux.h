@@ -29,6 +29,9 @@ NEM_svcmux_t;
 // After being passed to a NEM_txnmgr_t (or whatever) it should be decref'd.
 void NEM_svcmux_init(NEM_svcmux_t *this);
 
+// NEM_svcmux_copy increments the refcount for NEM_svcmux_t.
+NEM_svcmux_t* NEM_svcmux_copy(NEM_svcmux_t *this);
+
 // NEM_svcmux_add_handlers adds an array of handlers into the svcmux. Existing
 // svc/cmd handlers are overriden. If an entry has a NULL thunk, it removes an
 // existing entry. If there are duplicate handlers in the entries list, the

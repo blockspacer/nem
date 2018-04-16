@@ -7,6 +7,17 @@ NEM_svcmux_init(NEM_svcmux_t *this)
 	this->refcount = 1;
 }
 
+NEM_svcmux_t*
+NEM_svcmux_copy(NEM_svcmux_t *this)
+{
+	if (this->refcount <= 0) {
+		NEM_panic("NEM_svcmux_copy: invalid refcount");
+	}
+
+	this->refcount += 1;
+	return this;
+}
+
 static void
 NEM_svcmux_free(NEM_svcmux_t *this)
 {

@@ -17,6 +17,7 @@ struct NEM_txn_t {
 	uint64_t       seq;
 	struct timeval timeout;
 	NEM_txntype_t  type;
+	bool           cancelled;
 
 	size_t        children_len;
 	NEM_txn_t   **children;
@@ -24,11 +25,12 @@ struct NEM_txn_t {
 	void         *data;
 
 	size_t        messages_len;
-	NEM_msg_t   **messsages;
+	NEM_msg_t   **messages;
 
 	// NB: This isn't a NEM_thunk1_t because we might get multiple replies.
 	// The caller should check NEM_txn_ca.done to determine whether or not
-	// there will be additional calls.
+	// there will be additional calls. This should be set by the svc handler
+	// on incoming messages to indicate that we expect more.
 	NEM_thunk_t  *thunk;
 };
 
@@ -82,7 +84,16 @@ void NEM_txnin_reply_err(NEM_txnin_t *this, NEM_err_t err);
 // transaction object.
 void NEM_txnin_reply_continue(NEM_txnin_t *this, NEM_msg_t *msg);
 
-// NEM_txntree_t is a tree of transactions, ordered by seqid.
+// NEM_txnout_req finializes the outgoing transaction and sends the 
+// provided message.
+void NEM_txnout_req(NEM_txnout_t *this, NEM_msg_t *msg);
+
+// NEM_txnout_req_continue sends another message as part of the given
+// transaction. It does not finalize the transaction (NEM_txnout_req must
+// eventually be called).
+void NEM_txnout_req_continue(NEM_txnout_t *this, NEM_msg_t *msg);
+
+// NEM_txn*_tree_t is a tree of transactions, ordered by seqid.
 typedef SPLAY_HEAD(NEM_txnin_tree_t, NEM_txnin_t) NEM_txnin_tree_t;
 typedef SPLAY_HEAD(NEM_txnout_tree_t, NEM_txnout_t) NEM_txnout_tree_t;
 
@@ -105,16 +116,29 @@ void NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream);
 void NEM_txnmgr_free(NEM_txnmgr_t *this);
 
 // NEM_txnmgr_set_mux replaces the existing mux with the specified one.
+// This adds a ref to the passed in mux to keep it alive.
 void NEM_txnmgr_set_mux(NEM_txnmgr_t *this, NEM_svcmux_t *mux);
 
 // NEM_txnmgr_req initiates a request against the connection underlying
 // the NEM_txnmgr_t. If a parent NEM_txn_t is provided, the returned txn
 // is added as a child (and will be cancelled if the parent is cancelled).
 // The thunk will be passed a NEM_txn_ca for each incoming message for
-// the outgoing request.
+// the outgoing request. The returned transaction is valid until the thunk
+// is invoked with ca.done.
 NEM_txnout_t* NEM_txnmgr_req(
 	NEM_txnmgr_t *this,
 	NEM_txn_t    *parent,
+	NEM_thunk_t  *thunk
+);
+
+// NEM_txnmgr_req1 is a shortcut for sending a transaction with a single
+// transaction. The NEM_txnout_t isn't returned, so transactions sent this
+// way can't be explicitly cancelled (though cancelling the parent
+// transaction should still cancel it).
+void NEM_txnmgr_req1(
+	NEM_txnmgr_t *this,
+	NEM_txn_t    *parent,
+	NEM_msg_t    *msg,
 	NEM_thunk_t  *thunk
 );
 
@@ -124,10 +148,11 @@ NEM_txnout_t* NEM_txnmgr_req(
 void NEM_txnmgr_close(NEM_txnmgr_t *this);
 
 typedef struct {
-	NEM_err_t  err;
-	NEM_txn_t *txn;
-	NEM_msg_t *msg;
-	bool       done;
+	NEM_err_t     err;
+	NEM_txnin_t  *txnin;
+	NEM_txnout_t *txnout;
+	NEM_msg_t    *msg;
+	bool          done;
 }
 NEM_txn_ca;
 

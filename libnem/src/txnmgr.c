@@ -26,6 +26,49 @@ NEM_txn_cmp(const void *vlhs, const void *vrhs)
 	}
 }
 
+static void
+NEM_txn_add_msg(NEM_txn_t *this, NEM_msg_t *msg)
+{
+	this->messages_len += 1;
+	this->messages = NEM_panic_if_null(
+		realloc(this->messages, sizeof(NEM_msg_t*) * this->messages_len)
+	);
+	this->messages[this->messages_len - 1] = msg;
+}
+
+static void
+NEM_txn_add_child(NEM_txn_t *this, NEM_txn_t *child)
+{
+	this->children_len += 1;
+	this->children = NEM_panic_if_null(
+		realloc(this->children, sizeof(NEM_txn_t*) * this->children_len)
+	);
+	this->children[this->children_len - 1] = child;
+}
+
+static void
+NEM_txn_free(NEM_txn_t *this)
+{
+	for (size_t i = 0; i < this->children_len; i += 1) {
+		NEM_txn_free(this->children[i]);
+	}
+
+	for (size_t i = 0; i < this->messages_len; i += 1) {
+		NEM_msg_t *msg = this->messages[i];
+		if (NULL != msg) {
+			NEM_msg_free(msg);
+		}
+	}
+	free(this->messages);
+
+	if (NULL != this->thunk) {
+		NEM_thunk_free(this->thunk);
+	}
+
+	NEM_txnmgr_remove_txn(this->mgr, this);
+	free(this);
+}
+
 void*
 NEM_txn_data(NEM_txn_t *this)
 {
@@ -51,17 +94,18 @@ NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err)
 	}
 
 	NEM_txn_ca ca = {
-		.err  = err,
-		.txn  = this,
-		.msg  = NULL,
-		.done = true,
+		.err    = err,
+		.txnin  = (NEM_TXN_IN == this->type) ? (NEM_txnin_t*)this : NULL,
+		.txnout = (NEM_TXN_OUT == this->type) ? (NEM_txnout_t*)this : NULL,
+		.msg    = NULL,
+		.done   = true,
 	};
 	if (NULL != this->thunk) {
 		NEM_thunk_invoke(this->thunk, &ca);
 		NEM_thunk_free(this->thunk);
 	}
 
-	NEM_txnmgr_remove_txn(this->mgr, this);
+	NEM_txn_free(this);
 }
 
 void
@@ -88,16 +132,27 @@ NEM_txnout_set_timeout(NEM_txnout_t *this, int seconds)
 void
 NEM_txnin_reply(NEM_txnin_t *this, NEM_msg_t *msg)
 {
-	msg->packed.seq = this->base.seq;
-	msg->packed.flags |= NEM_PMSGFLAG_REPLY;
-	NEM_chan_send(
-		&this->base.mgr->chan,
-		msg,
-		NULL
-		// XXX: We probably want to have a thing here. But if we do that we'd
-		// need refcounts. Might need 'em anyway to properly implement
-		// timeouts.
-	);
+	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
+
+	if (this->base.cancelled) {
+		NEM_msg_free(msg);
+	}
+	else {
+		msg->packed.seq = this->base.seq;
+		msg->packed.flags |= NEM_PMSGFLAG_REPLY;
+		NEM_chan_send(
+			&this->base.mgr->chan,
+			msg,
+			NULL
+			// XXX: We probably want to have a thing here. But if we do that we'd
+			// need refcounts. Might need 'em anyway to properly implement
+			// timeouts.
+		);
+	}
+
+	if (done) {
+		NEM_txn_free(&this->base);
+	}
 }
 
 void
@@ -123,16 +178,30 @@ NEM_txnin_reply_continue(NEM_txnin_t *this, NEM_msg_t *msg)
 }
 
 void
-NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream)
+NEM_txnout_req(NEM_txnout_t *this, NEM_msg_t *msg)
 {
-	NEM_chan_init(&this->chan, stream);
-	SPLAY_INIT(&this->txns_in);
-	SPLAY_INIT(&this->txns_out);
-	this->mux = NULL;
-	this->seq = 1;
-	this->err = NEM_err_none;
+	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
+	msg->packed.seq = this->base.seq;
 
-	// XXX: Bind an on-close for the channel.
+	if (this->base.cancelled) {
+		done = true;
+		NEM_msg_free(msg);
+		return;
+	}
+
+	NEM_chan_send(&this->base.mgr->chan, msg, NULL);
+	// XXX: We'd want to maybe clear a timeout in that NULL callback.
+
+	if (done) {
+		// XXX: Do we set a timeout here for receiving a response?
+	}
+}
+
+void
+NEM_txnout_req_continue(NEM_txnout_t *this, NEM_msg_t *msg)
+{
+	msg->packed.flags |= NEM_PMSGFLAG_CONTINUE;
+	NEM_txnout_req(this, msg);
 }
 
 static void
@@ -157,6 +226,208 @@ NEM_txnmgr_shutdown(NEM_txnmgr_t *this, NEM_err_t err)
 	}
 
 	NEM_chan_free(&this->chan);
+
+	if (NULL != this->mux) {
+		NEM_svcmux_decref(this->mux);
+	}
+}
+
+static void
+NEM_txnmgr_on_reply(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
+{
+	// NB: This is called when we have an incoming message that's marked as
+	// a reply. There should be a matching txnout entry.
+	NEM_msg_t *msg = chan_ca->msg;
+	NEM_txnout_t dummy = {
+		.base = {
+			.seq = msg->packed.seq,
+		},
+	};
+
+	NEM_txnout_t *txnout = SPLAY_FIND(
+		NEM_txnout_tree_t,
+		&this->txns_out,
+		&dummy
+	);
+	if (NULL == txnout) {
+		// NB: No matching transaction. We can't reply to a reply, so it's
+		// impossible to cancel.
+		// XXX: When something's sending us garbage that we didn't ask for
+		// what do we do.
+		return;
+	}
+	if (NULL == txnout->base.thunk) {
+		// Uhh. What?
+		NEM_panic("NEM_txnmgr_on_reply: transaction has no handler?");
+	}
+
+	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
+	NEM_err_t err = NEM_err_none;
+
+	if ((msg->packed.flags & NEM_PMSGFLAG_CANCEL)) {
+		txnout->base.cancelled = true;
+		done = true;
+		err = NEM_err_static("remote cancelled transaction");
+	}
+
+	NEM_txn_ca ca = {
+		.err    = err,
+		.txnout = txnout,
+		.msg    = msg,
+		.done   = done,
+	};
+
+	NEM_txn_add_msg(&txnout->base, msg);
+	chan_ca->msg = NULL; // NB: Claim ownership over this message.
+	NEM_thunk_invoke(txnout->base.thunk, &ca);
+
+	if (done) {
+		NEM_txn_free(&txnout->base);
+	}
+}
+
+static void
+NEM_txnmgr_on_continue(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
+{
+	// NB: This is called when we have an incoming message that's marked
+	// as not-reply and continue. That means it's another bit of a multi-
+	// message request.
+	NEM_msg_t *msg = chan_ca->msg;
+	NEM_txnin_t dummy = {
+		.base = {
+			.seq = msg->packed.seq,
+		},
+	};
+
+	NEM_txnin_t *txnin = SPLAY_FIND(
+		NEM_txnin_tree_t,
+		&this->txns_in,
+		&dummy
+	);
+	if (NULL == txnin || NULL == txnin->base.thunk) {
+		// NB: No matching transaction -- send a cancel.
+		NEM_msg_t *reply = NEM_msg_new_reply(msg, 0, 0);
+		reply->packed.flags |= NEM_PMSGFLAG_CANCEL;
+		NEM_chan_send(&this->chan, reply, NULL);
+		return;
+	}
+
+	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
+	NEM_err_t err = NEM_err_none;
+
+	if ((msg->packed.flags & NEM_PMSGFLAG_CANCEL)) {
+		// They're cancelling their request.
+		txnin->base.cancelled = true;
+		done = true;
+		err = NEM_err_static("remote cancelled transaction");
+	}
+
+	NEM_txn_ca ca = {
+		.err   = err,
+		.txnin = txnin,
+		.msg   = msg,
+		.done  = done,
+	};
+
+	NEM_txn_add_msg(&txnin->base, msg);
+	chan_ca->msg = NULL; // NB: Claim ownership of this message.
+	NEM_thunk_invoke(txnin->base.thunk, &ca);
+
+	if (done) {
+		NEM_txn_free(&txnin->base);
+	}
+}
+
+static void
+NEM_txnmgr_on_msg(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_chan_ca *ca = varg;
+	NEM_msg_t *msg = ca->msg;
+	NEM_txnmgr_t *this = NEM_thunk_ptr(thunk);
+
+	if (!NEM_err_ok(ca->err)) {
+		NEM_txnmgr_shutdown(this, ca->err);
+		return;
+	}
+
+	// NB: Ordering here between reply/continue flags are important.
+	if (NEM_PMSGFLAG_REPLY & msg->packed.flags) {
+		NEM_txnmgr_on_reply(this, ca);
+		return;
+	}
+	if (NEM_PMSGFLAG_CONTINUE & msg->packed.flags) {
+		NEM_txnmgr_on_continue(this, ca);
+		return;
+	}
+
+	NEM_thunk_t *handler = NEM_svcmux_resolve(
+		this->mux,
+		msg->packed.service_id,
+		msg->packed.command_id
+	);
+
+	if (NULL == handler) {
+		// XXX: This shouldn't be using a generic error.
+		NEM_msghdr_err_t err = {
+			.code   = 1,
+			.reason = "no handler",
+		};
+		NEM_msghdr_t hdr = {
+			.err = &err,
+		};
+		NEM_msg_t *reply = NEM_msg_new_reply(msg, 0, 0);
+		NEM_msg_set_header(reply, &hdr);
+		NEM_chan_send(&this->chan, reply, NULL);
+		return;
+	}
+
+	NEM_txnin_t *txnin = NEM_malloc(sizeof(NEM_txnin_t));
+	txnin->base.seq = msg->packed.seq;
+	txnin->base.mgr = this;
+	txnin->base.type = NEM_TXN_IN;
+
+	NEM_txn_add_msg(&txnin->base, msg);
+	ca->msg = NULL;
+
+	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
+
+	SPLAY_INSERT(NEM_txnin_tree_t, &this->txns_in, txnin);
+	NEM_txn_ca txca = {
+		.err   = NEM_err_none,
+		.txnin = txnin,
+		.msg   = msg,
+		.done  = done,
+	};
+	NEM_thunk_invoke(handler, &txca);
+
+	// XXX: We should probably set a timeout here to detect failures
+	// to continue/reply.
+	
+	// XXX: We should probably check txnin->base.thunk here to ensure that
+	// the thing's been set up to process additional messages.
+}
+
+static void
+NEM_txnmgr_on_close(NEM_thunk1_t *thunk, void *varg)
+{
+	NEM_txnmgr_t *this = NEM_thunk1_ptr(thunk);
+	NEM_chan_ca *ca = varg;
+	NEM_txnmgr_shutdown(this, ca->err);
+}
+
+void
+NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream)
+{
+	NEM_chan_init(&this->chan, stream);
+	SPLAY_INIT(&this->txns_in);
+	SPLAY_INIT(&this->txns_out);
+	this->mux = NULL;
+	this->seq = 1;
+	this->err = NEM_err_none;
+
+	NEM_chan_on_close(&this->chan, NEM_thunk1_new_ptr(
+		&NEM_txnmgr_on_close, this
+	));
 }
 
 static void
@@ -180,4 +451,52 @@ void
 NEM_txnmgr_free(NEM_txnmgr_t *this)
 {
 	NEM_txnmgr_shutdown(this, NEM_err_static("txnmgr freed"));
+}
+
+void
+NEM_txnmgr_set_mux(NEM_txnmgr_t *this, NEM_svcmux_t *mux)
+{
+	bool new = (NULL == this->mux) && (NULL != mux);
+	if (NULL != this->mux) {
+		NEM_svcmux_decref(this->mux);
+	}
+	if (NULL != mux) {
+		this->mux = NEM_svcmux_copy(mux);
+	}
+
+	if (new) {
+		NEM_chan_on_msg(&this->chan, NEM_thunk_new_ptr(
+			&NEM_txnmgr_on_msg,
+			this
+		));
+	}
+}
+
+NEM_txnout_t*
+NEM_txnmgr_req(NEM_txnmgr_t *this, NEM_txn_t *parent, NEM_thunk_t *thunk)
+{
+	if (NULL == thunk) {
+		NEM_panic("NEM_txnmgr_req: cannot have a NULL thunk");
+	}
+
+	NEM_txnout_t *txnout = NEM_malloc(sizeof(NEM_txnout_t));
+	txnout->base.mgr = this;
+	txnout->base.type = NEM_TXN_OUT;
+	txnout->base.seq = ++this->seq;
+	txnout->base.thunk = thunk;
+
+	SPLAY_INSERT(NEM_txnout_tree_t, &this->txns_out, txnout);
+
+	return txnout;
+}
+
+void
+NEM_txnmgr_req1(
+	NEM_txnmgr_t *this,
+	NEM_txn_t    *parent,
+	NEM_msg_t    *msg,
+	NEM_thunk_t  *thunk
+) {
+	NEM_txnout_t *txnout = NEM_txnmgr_req(this, parent, thunk);
+	NEM_txnout_req(txnout, msg);
 }
