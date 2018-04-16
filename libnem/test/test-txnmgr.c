@@ -5,6 +5,7 @@ typedef struct {
 	NEM_fd_t fd_1, fd_2;
 	NEM_txnmgr_t t_1, t_2;
 	NEM_svcmux_t svc_1, svc_2;
+	NEM_txnout_t *txnout;
 	int ctr, ctr2;
 }
 work_t;
@@ -37,7 +38,7 @@ work_svc_1_1(NEM_thunk_t *thunk, void *varg)
 	ck_assert_ptr_eq(NULL, ca->txnout);
 	ck_assert(ca->done);
 
-	NEM_msg_t *msg = NEM_msg_new_reply(ca->msg, 0, 6);
+	NEM_msg_t *msg = NEM_msg_new(0, 6);
 	memcpy(msg->body, "hello", 6);
 	NEM_txnin_reply(ca->txnin, msg);
 }
@@ -55,12 +56,47 @@ work_svc_1_2(NEM_thunk_t *thunk, void *varg)
 	ck_assert_ptr_eq(NULL, ca->txnout);
 	ck_assert(ca->done);
 
-	NEM_msg_t *msg1 = NEM_msg_new_reply(ca->msg, 0, 0);
-	NEM_msg_t *msg2 = NEM_msg_new_reply(ca->msg, 0, 6);
+	NEM_msg_t *msg1 = NEM_msg_new(0, 0);
+	NEM_msg_t *msg2 = NEM_msg_new(0, 6);
 	memcpy(msg2->body, "world", 6);
 
 	NEM_txnin_reply_continue(ca->txnin, msg1);
 	NEM_txnin_reply(ca->txnin, msg2);
+}
+
+static void
+work_svc_1_3(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_txn_ca *ca = varg;
+	work_t *work = NEM_thunk_ptr(thunk);
+	work->ctr += 1000;
+
+	if (!NEM_err_ok(ca->err)) {
+		ck_assert(ca->done);
+	}
+	if (ca->done) {
+		NEM_msg_t *msg = NEM_msg_new(0, 5);
+		memcpy(msg->body, "done", 5);
+		NEM_txnin_reply(ca->txnin, msg);
+
+		NEM_app_after(&work->app, 500, NEM_thunk1_new_ptr(
+			&work_stop_clean,
+			work
+		));
+	}
+	else {
+		NEM_msg_t *msg = NEM_msg_new(0, 5);
+		memcpy(msg->body, "okay", 5);
+		NEM_txnin_reply_continue(ca->txnin, msg);
+	}
+}
+
+static void
+work_svc_1_4(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_txn_ca *ca = varg;
+	ck_err(ca->err);
+	work_svc_1_3(thunk, varg);
 }
 
 static void
@@ -82,6 +118,8 @@ work_init(work_t *work)
 	NEM_svcmux_entry_t svcs_1[] = {
 		{ 1, 1, NEM_thunk_new_ptr(&work_svc_1_1, work) },
 		{ 1, 2, NEM_thunk_new_ptr(&work_svc_1_2, work) },
+		{ 1, 3, NEM_thunk_new_ptr(&work_svc_1_3, work) },
+		{ 1, 4, NEM_thunk_new_ptr(&work_svc_1_4, work) },
 	};
 	NEM_svcmux_entry_t svcs_2[] = {
 	};
@@ -112,6 +150,18 @@ START_TEST(scaffolding)
 {
 	work_t work;
 	work_init(&work);
+	work_free(&work);
+}
+END_TEST
+
+START_TEST(set_mux)
+{
+	work_t work;
+	work_init(&work);
+	NEM_svcmux_t mux;
+	NEM_svcmux_init(&mux);
+	NEM_txnmgr_set_mux(&work.t_1, &mux);
+	NEM_svcmux_decref(&mux);
 	work_free(&work);
 }
 END_TEST
@@ -198,6 +248,50 @@ START_TEST(send_recv_1_2)
 
 	ck_err(NEM_app_run(&work.app));
 	ck_assert_int_eq(work.ctr, 100);
+	ck_assert_int_eq(work.ctr2, 2);
+	work_free(&work);
+}
+END_TEST
+
+static void
+send_recv_1_3_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_txn_ca *ca = varg;
+	work->ctr2 += 1;
+
+	ck_err(ca->err);
+
+	if (work->ctr2 == 1) {
+		ck_assert_int_eq(5, ca->msg->packed.body_len);
+		ck_assert_str_eq("okay", ca->msg->body);
+		NEM_msg_t *msg = NEM_msg_new(0, 0);
+		NEM_txnout_req(work->txnout, msg);
+	}
+	else {
+		ck_assert_int_eq(5, ca->msg->packed.body_len);
+		ck_assert_str_eq("done", ca->msg->body);
+		ck_assert(ca->done);
+	}
+}
+
+START_TEST(send_recv_1_3)
+{
+	work_t work;
+	work_init(&work);
+
+	work.txnout = NEM_txnmgr_req(&work.t_2, NULL, NEM_thunk_new_ptr(
+		&send_recv_1_3_cb,
+		&work
+	));
+
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
+	msg->packed.service_id = 1;
+	msg->packed.command_id = 3;
+	NEM_txnout_req_continue(work.txnout, msg);
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(work.ctr, 2000);
 	ck_assert_int_eq(work.ctr2, 2);
 	work_free(&work);
 }
@@ -292,15 +386,56 @@ START_TEST(err_fd_closed_srvsend)
 }
 END_TEST
 
+static void
+err_fd_closed_srvrecv_cb(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_txn_ca *ca = varg;
+	work_t *work = NEM_thunk_ptr(thunk);
+	work->ctr2 += 1;
+
+	if (!NEM_err_ok(ca->err)) {
+		ck_assert(ca->done);
+	}
+
+	if (work->ctr2 == 1) {
+		NEM_fd_close(&work->fd_1);
+	}
+}
+
+START_TEST(err_fd_closed_srvrecv)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
+	msg->packed.service_id = 1;
+	msg->packed.command_id = 3;
+
+	work.txnout = NEM_txnmgr_req(&work.t_2, NULL, NEM_thunk_new_ptr(
+		&err_fd_closed_srvrecv_cb,
+		&work
+	));
+	NEM_txnout_req_continue(work.txnout, msg);
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(work.ctr, 10000);
+	ck_assert_int_eq(work.ctr2, 2);
+	work_free(&work);
+}
+END_TEST
+
 Suite*
 suite_txnmgr()
 {
 	tcase_t tests[] = {
 		{ "scaffolding",           &scaffolding           },
+		{ "set_mux",               &set_mux               },
 		{ "send_recv_1_1",         &send_recv_1_1         },
 		{ "send_recv_1_2",         &send_recv_1_2         },
+		{ "send_recv_1_3",         &send_recv_1_3         },
 		{ "err_fd_closed_clisend", &err_fd_closed_clisend },
 		{ "err_fd_closed_srvsend", &err_fd_closed_srvsend },
+		//{ "err_fd_closed_srvrecv", &err_fd_closed_srvrecv },
 	};
 
 	return tcase_build_suite("txnmgr", tests, sizeof(tests));

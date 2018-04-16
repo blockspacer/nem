@@ -157,6 +157,7 @@ NEM_txnin_reply(NEM_txnin_t *this, NEM_msg_t *msg)
 void
 NEM_txnin_reply_err(NEM_txnin_t *this, NEM_err_t err)
 {
+	// XXX: Should have serializable errors or something.
 	NEM_msghdr_err_t hdrerr = {
 		.code   = 1,
 		.reason = NEM_err_string(err),
@@ -269,6 +270,15 @@ NEM_txnmgr_on_reply(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 		err = NEM_err_static("remote cancelled transaction");
 	}
 
+	NEM_msghdr_t *hdr = NULL;
+	if (NEM_err_ok(err) && 0 < msg->packed.header_len) {
+		hdr = NEM_msg_header(msg);
+		if (NULL != hdr && NULL != hdr->err) {
+			// XXX: UNSAFE LIFETIMES HERE
+			err = NEM_err_static(hdr->err->reason);
+		}
+	}
+
 	NEM_txn_ca ca = {
 		.err    = err,
 		.txnout = txnout,
@@ -280,35 +290,77 @@ NEM_txnmgr_on_reply(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 	chan_ca->msg = NULL; // NB: Claim ownership over this message.
 	NEM_thunk_invoke(txnout->base.thunk, &ca);
 
+	if (NULL != hdr) {
+		NEM_msghdr_free(hdr);
+	}
+
 	if (done) {
 		NEM_txn_free(&txnout->base);
 	}
 }
 
 static void
-NEM_txnmgr_on_continue(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
+NEM_txnmgr_on_req(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 {
-	// NB: This is called when we have an incoming message that's marked
-	// as not-reply and continue. That means it's another bit of a multi-
-	// message request.
+	// NB: This is called when we have an incoming message that's the start of
+	// or part of an incoming request.
 	NEM_msg_t *msg = chan_ca->msg;
+
+	// NB: Find an existing txnin if we've got one. The cached service/command
+	// ids override anything in the message if there's a matching seq.
 	NEM_txnin_t dummy = {
 		.base = {
 			.seq = msg->packed.seq,
 		},
 	};
-
 	NEM_txnin_t *txnin = SPLAY_FIND(
 		NEM_txnin_tree_t,
 		&this->txns_in,
 		&dummy
 	);
-	if (NULL == txnin || NULL == txnin->base.thunk) {
-		// NB: No matching transaction -- send a cancel.
+	if (NULL != txnin) {
+		msg->packed.service_id = txnin->service_id;
+		msg->packed.command_id = txnin->command_id;
+	}
+
+	// NB: Handlers can be removed at runtime; there isn't much that can be
+	// done about this since the thunks are owned by the svcmux. So whenever
+	// a message comes in, we need to re-resolve the handler against the mux
+	// (which should be pretty fast).
+	NEM_thunk_t *handler = NEM_svcmux_resolve(
+		this->mux,
+		msg->packed.service_id,
+		msg->packed.command_id
+	);
+	if (NULL == handler) {
+		// XXX: This shouldn't be using a generic error.
+		NEM_msghdr_err_t err = {
+			.code   = 1,
+			.reason = "no handler",
+		};
+		NEM_msghdr_t hdr = {
+			.err = &err,
+		};
 		NEM_msg_t *reply = NEM_msg_new_reply(msg, 0, 0);
-		reply->packed.flags |= NEM_PMSGFLAG_CANCEL;
+		NEM_msg_set_header(reply, &hdr);
 		NEM_chan_send(&this->chan, reply, NULL);
 		return;
+	}
+
+	if (NULL == txnin) {
+		// NB: If this is a cancel request for a transaction we don't have
+		// a record for ... just ... ignore it.
+		if (msg->packed.flags & NEM_PMSGFLAG_CANCEL) {
+			return;
+		}
+
+		txnin = NEM_malloc(sizeof(NEM_txnin_t));
+		txnin->base.seq = msg->packed.seq;
+		txnin->base.mgr = this;
+		txnin->base.type = NEM_TXN_IN;
+		txnin->service_id = msg->packed.service_id;
+		txnin->command_id = msg->packed.command_id;
+		SPLAY_INSERT(NEM_txnin_tree_t, &this->txns_in, txnin);
 	}
 
 	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
@@ -330,11 +382,13 @@ NEM_txnmgr_on_continue(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 
 	NEM_txn_add_msg(&txnin->base, msg);
 	chan_ca->msg = NULL; // NB: Claim ownership of this message.
-	NEM_thunk_invoke(txnin->base.thunk, &ca);
+	NEM_thunk_invoke(handler, &ca);
 
-	if (done) {
-		NEM_txn_free(&txnin->base);
-	}
+	// NB: The transaction doesn't get freed until the handler sends the
+	// final reply.
+	// XXX: We should probably set up a timeout here or something maybe? to
+	// automatically reply after a period? Maybe it's better to have all that
+	// logic on the client-side.
 }
 
 static void
@@ -349,55 +403,12 @@ NEM_txnmgr_on_msg(NEM_thunk_t *thunk, void *varg)
 		return;
 	}
 
-	// NB: Ordering here between reply/continue flags are important.
 	if (NEM_PMSGFLAG_REPLY & msg->packed.flags) {
 		NEM_txnmgr_on_reply(this, ca);
-		return;
 	}
-	if (NEM_PMSGFLAG_CONTINUE & msg->packed.flags) {
-		NEM_txnmgr_on_continue(this, ca);
-		return;
+	else {
+		NEM_txnmgr_on_req(this, ca);
 	}
-
-	NEM_thunk_t *handler = NEM_svcmux_resolve(
-		this->mux,
-		msg->packed.service_id,
-		msg->packed.command_id
-	);
-
-	if (NULL == handler) {
-		// XXX: This shouldn't be using a generic error.
-		NEM_msghdr_err_t err = {
-			.code   = 1,
-			.reason = "no handler",
-		};
-		NEM_msghdr_t hdr = {
-			.err = &err,
-		};
-		NEM_msg_t *reply = NEM_msg_new_reply(msg, 0, 0);
-		NEM_msg_set_header(reply, &hdr);
-		NEM_chan_send(&this->chan, reply, NULL);
-		return;
-	}
-
-	NEM_txnin_t *txnin = NEM_malloc(sizeof(NEM_txnin_t));
-	txnin->base.seq = msg->packed.seq;
-	txnin->base.mgr = this;
-	txnin->base.type = NEM_TXN_IN;
-
-	NEM_txn_add_msg(&txnin->base, msg);
-	ca->msg = NULL;
-
-	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
-
-	SPLAY_INSERT(NEM_txnin_tree_t, &this->txns_in, txnin);
-	NEM_txn_ca txca = {
-		.err   = NEM_err_none,
-		.txnin = txnin,
-		.msg   = msg,
-		.done  = done,
-	};
-	NEM_thunk_invoke(handler, &txca);
 
 	// XXX: We should probably set a timeout here to detect failures
 	// to continue/reply.
@@ -455,13 +466,15 @@ NEM_txnmgr_free(NEM_txnmgr_t *this)
 void
 NEM_txnmgr_set_mux(NEM_txnmgr_t *this, NEM_svcmux_t *mux)
 {
-	bool new = (NULL == this->mux) && (NULL != mux);
 	if (NULL != this->mux) {
 		NEM_svcmux_decref(this->mux);
 	}
-	if (NULL != mux) {
-		this->mux = NEM_svcmux_copy(mux);
+	if (NULL == mux) {
+		NEM_panic("NEM_txnmgr_set_mux: cannot set a NULL mux");
 	}
+
+	bool new = (NULL == this->mux) && (NULL != mux);
+	this->mux = NEM_svcmux_copy(mux);
 
 	if (new) {
 		NEM_chan_on_msg(&this->chan, NEM_thunk_new_ptr(

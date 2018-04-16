@@ -18,7 +18,19 @@ tcase_t;
 
 Suite* tcase_build_suite(const char *name, tcase_t *tests, size_t blen);
 
-void ck_err(NEM_err_t err);
+#define ck_err(err) \
+	if (!NEM_err_ok(err)) { \
+		char *tmp; \
+		asprintf(\
+			&tmp,\
+			"%s\n  -> in %s, %s:%d",\
+			NEM_err_string(err),\
+			__FUNCTION__,\
+			__FILE__,\
+			__LINE__\
+		); \
+		ck_assert_msg(false, tmp); \
+	}
 
 // fucking shit.
 #ifndef CK_FLOATING_DIG

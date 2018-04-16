@@ -39,6 +39,8 @@ struct NEM_txn_t {
 typedef struct NEM_txnin_t {
 	NEM_txn_t                base;
 	SPLAY_ENTRY(NEM_txnin_t) link;
+	uint16_t                 service_id;
+	uint16_t                 command_id;
 }
 NEM_txnin_t;
 
