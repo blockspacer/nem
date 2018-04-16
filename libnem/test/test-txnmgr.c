@@ -72,10 +72,8 @@ work_svc_1_3(NEM_thunk_t *thunk, void *varg)
 	NEM_txn_ca *ca = varg;
 	work_t *work = NEM_thunk_ptr(thunk);
 	work->ctr += 1000;
+	ck_err(ca->err);
 
-	if (!NEM_err_ok(ca->err)) {
-		ck_assert(ca->done);
-	}
 	if (ca->done) {
 		NEM_msg_t *msg = NEM_msg_new(0, 5);
 		memcpy(msg->body, "done", 5);
@@ -91,14 +89,6 @@ work_svc_1_3(NEM_thunk_t *thunk, void *varg)
 		memcpy(msg->body, "okay", 5);
 		NEM_txnin_reply_continue(ca->txnin, msg);
 	}
-}
-
-static void
-work_svc_1_4(NEM_thunk_t *thunk, void *varg)
-{
-	NEM_txn_ca *ca = varg;
-	ck_err(ca->err);
-	work_svc_1_3(thunk, varg);
 }
 
 static void
@@ -121,7 +111,6 @@ work_init(work_t *work)
 		{ 1, 1, NEM_thunk_new_ptr(&work_svc_1_1, work) },
 		{ 1, 2, NEM_thunk_new_ptr(&work_svc_1_2, work) },
 		{ 1, 3, NEM_thunk_new_ptr(&work_svc_1_3, work) },
-		{ 1, 4, NEM_thunk_new_ptr(&work_svc_1_4, work) },
 	};
 	NEM_svcmux_entry_t svcs_2[] = {
 	};
@@ -394,39 +383,37 @@ START_TEST(err_fd_closed_srvsend)
 END_TEST
 
 static void
-err_fd_closed_srvrecv_cb(NEM_thunk_t *thunk, void *varg)
+err_send_invalid_cmd_cb(NEM_thunk_t *thunk, void *varg)
 {
-	NEM_txn_ca *ca = varg;
 	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_txn_ca *ca = varg;
 	work->ctr2 += 1;
-
-	if (!NEM_err_ok(ca->err)) {
-		ck_assert(ca->done);
-	}
-
-	if (work->ctr2 == 1) {
-		NEM_fd_close(&work->fd_1);
-	}
+	// NB: This is relying on message errors being converted to NEM_err_t which
+	// is currently a massive hack orz.
+	ck_assert(!NEM_err_ok(ca->err));
+	ck_assert_ptr_ne(NULL, ca->txnout);
+	ck_assert_ptr_eq(NULL, ca->txnin);
+	ck_assert_ptr_ne(NULL, ca->mgr);
+	ck_assert(ca->done);
+	NEM_app_stop(&work->app);
 }
 
-START_TEST(err_fd_closed_srvrecv)
+START_TEST(err_send_invalid_cmd)
 {
 	work_t work;
 	work_init(&work);
 
 	NEM_msg_t *msg = NEM_msg_new(0, 0);
-	msg->packed.service_id = 1;
-	msg->packed.command_id = 3;
+	msg->packed.service_id = 4;
+	msg->packed.command_id = 0;
 
-	work.txnout = NEM_txnmgr_req(&work.t_2, NULL, NEM_thunk_new_ptr(
-		&err_fd_closed_srvrecv_cb,
+	NEM_txnmgr_req1(&work.t_2, NULL, msg, NEM_thunk_new_ptr(
+		&err_send_invalid_cmd_cb,
 		&work
 	));
-	NEM_txnout_req_continue(work.txnout, msg);
 
 	ck_err(NEM_app_run(&work.app));
-	ck_assert_int_eq(work.ctr, 10000);
-	ck_assert_int_eq(work.ctr2, 2);
+	ck_assert_int_eq(work.ctr2, 1);
 	work_free(&work);
 }
 END_TEST
@@ -442,7 +429,7 @@ suite_txnmgr()
 		{ "send_recv_1_3",         &send_recv_1_3         },
 		{ "err_fd_closed_clisend", &err_fd_closed_clisend },
 		{ "err_fd_closed_srvsend", &err_fd_closed_srvsend },
-		//{ "err_fd_closed_srvrecv", &err_fd_closed_srvrecv },
+		{ "err_send_invalid_cmd",  &err_send_invalid_cmd  },
 	};
 
 	return tcase_build_suite("txnmgr", tests, sizeof(tests));
