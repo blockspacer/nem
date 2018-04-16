@@ -97,6 +97,7 @@ NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err)
 		.err    = err,
 		.txnin  = (NEM_TXN_IN == this->type) ? (NEM_txnin_t*)this : NULL,
 		.txnout = (NEM_TXN_OUT == this->type) ? (NEM_txnout_t*)this : NULL,
+		.mgr    = this->mgr,
 		.msg    = NULL,
 		.done   = true,
 	};
@@ -282,6 +283,7 @@ NEM_txnmgr_on_reply(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 	NEM_txn_ca ca = {
 		.err    = err,
 		.txnout = txnout,
+		.mgr    = this,
 		.msg    = msg,
 		.done   = done,
 	};
@@ -376,6 +378,7 @@ NEM_txnmgr_on_req(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 	NEM_txn_ca ca = {
 		.err   = err,
 		.txnin = txnin,
+		.mgr   = this,
 		.msg   = msg,
 		.done  = done,
 	};

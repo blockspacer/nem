@@ -34,6 +34,7 @@ work_svc_1_1(NEM_thunk_t *thunk, void *varg)
 
 	ck_err(ca->err);
 	ck_assert_ptr_ne(NULL, ca->msg);
+	ck_assert_ptr_ne(NULL, ca->mgr);
 	ck_assert_ptr_ne(NULL, ca->txnin);
 	ck_assert_ptr_eq(NULL, ca->txnout);
 	ck_assert(ca->done);
@@ -52,6 +53,7 @@ work_svc_1_2(NEM_thunk_t *thunk, void *varg)
 
 	ck_err(ca->err);
 	ck_assert_ptr_ne(NULL, ca->msg);
+	ck_assert_ptr_ne(NULL, ca->mgr);
 	ck_assert_ptr_ne(NULL, ca->txnin);
 	ck_assert_ptr_eq(NULL, ca->txnout);
 	ck_assert(ca->done);
@@ -175,6 +177,7 @@ send_recv_1_1_cb(NEM_thunk_t *thunk, void *varg)
 	ck_err(ca->err);
 	ck_assert_ptr_ne(NULL, ca->txnout);
 	ck_assert_ptr_eq(NULL, ca->txnin);
+	ck_assert_ptr_ne(NULL, ca->mgr);
 	ck_assert_ptr_ne(NULL, ca->msg);
 	ck_assert(ca->done);
 	ck_assert_int_eq(6, ca->msg->packed.body_len);
@@ -215,6 +218,7 @@ send_recv_1_2_cb(NEM_thunk_t *thunk, void *varg)
 	ck_err(ca->err);
 	ck_assert_ptr_ne(NULL, ca->txnout);
 	ck_assert_ptr_eq(NULL, ca->txnin);
+	ck_assert_ptr_ne(NULL, ca->mgr);
 	ck_assert_ptr_ne(NULL, ca->msg);
 
 	if (0 == work->ctr2) {
@@ -305,6 +309,7 @@ err_fd_closed_clisend_cb(NEM_thunk_t *thunk, void *varg)
 	ck_assert(!NEM_err_ok(ca->err));
 	ck_assert_ptr_eq(NULL, ca->txnin);
 	ck_assert_ptr_ne(NULL, ca->txnout);
+	ck_assert_ptr_ne(NULL, ca->mgr);
 	ck_assert_int_eq(0, ca->txnout->base.messages_len);
 	ck_assert_ptr_eq(NULL, ca->msg);
 	ck_assert(ca->done);
@@ -345,6 +350,7 @@ err_fd_closed_srvsend_cb(NEM_thunk_t *thunk, void *varg)
 		ck_err(ca->err);
 		ck_assert_ptr_eq(NULL, ca->txnin);
 		ck_assert_ptr_ne(NULL, ca->txnout);
+		ck_assert_ptr_ne(NULL, ca->mgr);
 		ck_assert_int_eq(1, ca->txnout->base.messages_len);
 		ck_assert_ptr_ne(NULL, ca->msg);
 		ck_assert(!ca->done);
@@ -355,6 +361,7 @@ err_fd_closed_srvsend_cb(NEM_thunk_t *thunk, void *varg)
 		ck_assert(!NEM_err_ok(ca->err));
 		ck_assert_ptr_eq(NULL, ca->txnin);
 		ck_assert_ptr_ne(NULL, ca->txnout);
+		ck_assert_ptr_ne(NULL, ca->mgr);
 		ck_assert_int_eq(1, ca->txnout->base.messages_len);
 		ck_assert_ptr_eq(NULL, ca->msg);
 		ck_assert(ca->done);

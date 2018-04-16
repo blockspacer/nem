@@ -26,11 +26,6 @@ struct NEM_txn_t {
 
 	size_t        messages_len;
 	NEM_msg_t   **messages;
-
-	// NB: This isn't a NEM_thunk1_t because we might get multiple replies.
-	// The caller should check NEM_txn_ca.done to determine whether or not
-	// there will be additional calls. This should be set by the svc handler
-	// on incoming messages to indicate that we expect more.
 	NEM_thunk_t  *thunk;
 };
 
@@ -153,6 +148,7 @@ typedef struct {
 	NEM_err_t     err;
 	NEM_txnin_t  *txnin;
 	NEM_txnout_t *txnout;
+	NEM_txnmgr_t *mgr;
 	NEM_msg_t    *msg;
 	bool          done;
 }
