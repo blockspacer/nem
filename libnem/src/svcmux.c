@@ -8,10 +8,10 @@ NEM_svcmux_init(NEM_svcmux_t *this)
 }
 
 NEM_svcmux_t*
-NEM_svcmux_copy(NEM_svcmux_t *this)
+NEM_svcmux_ref(NEM_svcmux_t *this)
 {
 	if (this->refcount <= 0) {
-		NEM_panic("NEM_svcmux_copy: invalid refcount");
+		NEM_panic("NEM_svcmux_ref: invalid refcount");
 	}
 
 	this->refcount += 1;
@@ -88,10 +88,10 @@ NEM_svcmux_add_handlers(
 }
 
 void
-NEM_svcmux_decref(NEM_svcmux_t *this)
+NEM_svcmux_unref(NEM_svcmux_t *this)
 {
 	if (0 > this->refcount) {
-		NEM_panic("NEM_svcmux_decref: refcount invalid");
+		NEM_panic("NEM_svcmux_unref: refcount invalid");
 	}
 
 	this->refcount -= 1;

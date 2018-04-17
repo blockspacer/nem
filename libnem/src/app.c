@@ -7,10 +7,10 @@
 #include <stdio.h>
 
 static inline int
-NEM_timer_cmp(const void *vlhs, const void *vrhs)
+NEM_timer1_cmp(const void *vlhs, const void *vrhs)
 {
-	const NEM_timer_t *lhs = vlhs;
-	const NEM_timer_t *rhs = vrhs;
+	const NEM_timer1_t *lhs = vlhs;
+	const NEM_timer1_t *rhs = vrhs;
 
 	if (lhs->invoke_at.tv_sec < rhs->invoke_at.tv_sec) {
 		return -1;
@@ -29,7 +29,7 @@ NEM_timer_cmp(const void *vlhs, const void *vrhs)
 }
 
 static inline bool
-NEM_timer_before(NEM_timer_t *this, struct timeval t)
+NEM_timer1_before(NEM_timer1_t *this, struct timeval t)
 {
 	if (this->invoke_at.tv_sec > t.tv_sec) {
 		return false;
@@ -43,11 +43,11 @@ NEM_timer_before(NEM_timer_t *this, struct timeval t)
 }
 
 // XXX: Use SPLAY_PROTOTYPE_STATIC/SPLAY_GENERATE_STATIC instead here.
-SPLAY_PROTOTYPE(NEM_timer_tree_t, NEM_timer_t, link, NEM_timer_cmp);
-SPLAY_GENERATE(NEM_timer_tree_t, NEM_timer_t, link, NEM_timer_cmp);
+SPLAY_PROTOTYPE(NEM_timer1_tree_t, NEM_timer1_t, link, NEM_timer1_cmp);
+SPLAY_GENERATE(NEM_timer1_tree_t, NEM_timer1_t, link, NEM_timer1_cmp);
 
 static NEM_err_t
-NEM_app_timer_schedule(NEM_app_t *this, struct timeval now, NEM_timer_t *next)
+NEM_app_timer1_schedule(NEM_app_t *this, struct timeval now, NEM_timer1_t *next)
 {
 	struct kevent ev;
 
@@ -87,7 +87,7 @@ NEM_app_timer_schedule(NEM_app_t *this, struct timeval now, NEM_timer_t *next)
 }
 
 static inline void
-NEM_app_timer_now(struct timeval *t)
+NEM_app_timer1_now(struct timeval *t)
 {
 	if (gettimeofday(t, NULL)) {
 		NEM_panicf("gettimeofday: %s", strerror(errno));
@@ -95,7 +95,7 @@ NEM_app_timer_now(struct timeval *t)
 }
 
 static inline void
-NEM_app_timer_add_ms(struct timeval *t, int ms)
+NEM_app_timer1_add_ms(struct timeval *t, int ms)
 {
 	t->tv_sec += ms / 1000;
 	t->tv_usec += (ms % 1000) * 1000;
@@ -110,23 +110,23 @@ NEM_app_on_timer(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_app_t *this = NEM_thunk_ptr(thunk);
 	struct timeval now;
-	NEM_app_timer_now(&now);
+	NEM_app_timer1_now(&now);
 
 	for (;;) {
-		NEM_timer_t *timer = SPLAY_MIN(NEM_timer_tree_t, &this->timers);
-		if (NULL == timer || !NEM_timer_before(timer, now)) {
+		NEM_timer1_t *timer = SPLAY_MIN(NEM_timer1_tree_t, &this->timers);
+		if (NULL == timer || !NEM_timer1_before(timer, now)) {
 			break;
 		}
 
 		NEM_thunk1_invoke(&timer->thunk, NULL);
-		SPLAY_REMOVE(NEM_timer_tree_t, &this->timers, timer);
+		SPLAY_REMOVE(NEM_timer1_tree_t, &this->timers, timer);
 		free(timer);
 	}
 
-	NEM_err_t err = NEM_app_timer_schedule(
+	NEM_err_t err = NEM_app_timer1_schedule(
 		this,
 		now,
-		SPLAY_MIN(NEM_timer_tree_t, &this->timers)
+		SPLAY_MIN(NEM_timer1_tree_t, &this->timers)
 	);
 	if (!NEM_err_ok(err)) {
 		NEM_panicf("NEM_app_on_timer: %s", NEM_err_string(err));
@@ -213,9 +213,9 @@ NEM_app_free(NEM_app_t *this)
 		free(this->chan);
 	}
 
-	NEM_timer_t *timer = NULL;
-	while (NULL != (timer = SPLAY_MIN(NEM_timer_tree_t, &this->timers))) {
-		SPLAY_REMOVE(NEM_timer_tree_t, &this->timers, timer);
+	NEM_timer1_t *timer = NULL;
+	while (NULL != (timer = SPLAY_MIN(NEM_timer1_tree_t, &this->timers))) {
+		SPLAY_REMOVE(NEM_timer1_tree_t, &this->timers, timer);
 		NEM_thunk1_discard(&timer->thunk);
 		free(timer);
 	}
@@ -228,34 +228,112 @@ NEM_app_free(NEM_app_t *this)
 	this->kq = 0;
 }
 
-void
-NEM_app_after(NEM_app_t *this, uint64_t ms, NEM_thunk1_t *cb)
+static void
+NEM_app_insert_timer(NEM_app_t *this, NEM_timer1_t *timer, struct timeval now)
 {
-	struct timeval now;
-	NEM_app_timer_now(&now);
-
-	NEM_timer_t *timer = NEM_malloc(sizeof(NEM_timer_t));
-	timer->thunk = cb;
-	timer->invoke_at = now;
-	NEM_app_timer_add_ms(&timer->invoke_at, ms);
-
-	SPLAY_INSERT(NEM_timer_tree_t, &this->timers, timer);
+	SPLAY_INSERT(NEM_timer1_tree_t, &this->timers, timer);
 
 	// If the inserted timer should occur before the currently scheduled
 	// interruption, update the thingy to fire sooner.
-	NEM_timer_t *next_timer = SPLAY_MIN(NEM_timer_tree_t, &this->timers);
+	NEM_timer1_t *next_timer = SPLAY_MIN(NEM_timer1_tree_t, &this->timers);
 	if (timer == next_timer) {
-		NEM_err_t err = NEM_app_timer_schedule(this, now, next_timer);
+		NEM_err_t err = NEM_app_timer1_schedule(this, now, next_timer);
 		if (!NEM_err_ok(err)) {
-			NEM_panicf("NEM_app_after: %s", NEM_err_string(err));
+			NEM_panicf("NEM_app_insert_timer: %s", NEM_err_string(err));
 		}
 	}
+}
+
+static NEM_timer1_t*
+NEM_app_after_internal(NEM_app_t *this, uint64_t ms, NEM_thunk1_t *cb)
+{
+	struct timeval now;
+	NEM_app_timer1_now(&now);
+
+	NEM_timer1_t *timer = NEM_malloc(sizeof(NEM_timer1_t));
+	timer->thunk = cb;
+	timer->invoke_at = now;
+	NEM_app_timer1_add_ms(&timer->invoke_at, ms);
+
+	NEM_app_insert_timer(this, timer, now);
+
+	return timer;
+}
+
+void
+NEM_app_after(NEM_app_t *this, uint64_t ms, NEM_thunk1_t *cb)
+{
+	NEM_app_after_internal(this, ms, cb);
 }
 
 void
 NEM_app_defer(NEM_app_t *this, NEM_thunk1_t *cb)
 {
 	NEM_app_after(this, 0, cb);
+}
+
+void
+NEM_timer_init(NEM_timer_t *this, NEM_app_t *app, NEM_thunk_t *thunk)
+{
+	bzero(this, sizeof(*this));
+	this->app = app;
+	this->thunk = thunk;
+}
+
+static void
+NEM_timer_on_timer(NEM_thunk1_t *thunk, void *varg)
+{
+	NEM_timer_t *this = NEM_thunk1_ptr(thunk);
+	this->active = NULL;
+
+	NEM_thunk_invoke(this->thunk, this);
+}
+
+void
+NEM_timer_set(NEM_timer_t *this, uint64_t ms_after)
+{
+	if (NULL != this->active) {
+		// Sneakily adjust the underlying timer entry.
+		SPLAY_REMOVE(NEM_timer1_tree_t, &this->app->timers, this->active);
+
+		struct timeval now;
+		NEM_app_timer1_now(&now);
+		this->active->invoke_at = now;
+		NEM_app_timer1_add_ms(&this->active->invoke_at, ms_after);
+
+		NEM_app_insert_timer(this->app, this->active, now);
+	}
+	else {
+		// Otherwise, need to create a new timer entry.
+		this->active = NEM_app_after_internal(
+			this->app,
+			ms_after,
+			NEM_thunk1_new_ptr(
+				&NEM_timer_on_timer,
+				this
+			)
+		);
+	}
+}
+
+void
+NEM_timer_cancel(NEM_timer_t *this)
+{
+	if (NULL == this->active) {
+		return;
+	}
+
+	SPLAY_REMOVE(NEM_timer1_tree_t, &this->app->timers, this->active);
+	NEM_thunk1_discard(&this->active->thunk);
+	free(this->active);
+	this->active = NULL;
+}
+
+void
+NEM_timer_free(NEM_timer_t *this)
+{
+	NEM_timer_cancel(this);
+	NEM_thunk_free(this->thunk);
 }
 
 static const char *

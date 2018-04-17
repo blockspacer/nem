@@ -115,18 +115,24 @@ NEM_txn_cancel(NEM_txn_t *this)
 }
 
 void
-NEM_txnout_set_timeout(NEM_txnout_t *this, int seconds)
+NEM_txnout_set_timeout(NEM_txnout_t *this, int ms)
 {
-	if (-1 == seconds) {
+	if (-1 == ms) {
 		bzero(&this->base.timeout, sizeof(this->base.timeout));
 		return;
 	}
-	if (seconds < 0) {
-		NEM_panic("NEM_txnout_set_timeout: invalid number of seconds");
+	if (ms < 0) {
+		NEM_panic("NEM_txnout_set_timeout: invalid number of ms");
 	}
 
-	gettimeofday(&this->base.timeout, NULL);
-	this->base.timeout.tv_sec += seconds;
+	struct timeval *t = &this->base.timeout;
+	gettimeofday(t, NULL);
+	t->tv_sec += ms / 1000;
+	t->tv_usec += (ms % 1000) * 1000;
+
+	// NB: Handle overflow for canonicalized values.
+	t->tv_sec += t->tv_usec / (1000 * 1000);
+	t->tv_usec = t->tv_usec % (1000 * 1000);
 }
 
 void
@@ -229,7 +235,7 @@ NEM_txnmgr_shutdown(NEM_txnmgr_t *this, NEM_err_t err)
 	NEM_chan_free(&this->chan);
 
 	if (NULL != this->mux) {
-		NEM_svcmux_decref(this->mux);
+		NEM_svcmux_unref(this->mux);
 	}
 }
 
@@ -470,14 +476,14 @@ void
 NEM_txnmgr_set_mux(NEM_txnmgr_t *this, NEM_svcmux_t *mux)
 {
 	if (NULL != this->mux) {
-		NEM_svcmux_decref(this->mux);
+		NEM_svcmux_unref(this->mux);
 	}
 	if (NULL == mux) {
 		NEM_panic("NEM_txnmgr_set_mux: cannot set a NULL mux");
 	}
 
 	bool new = (NULL == this->mux) && (NULL != mux);
-	this->mux = NEM_svcmux_copy(mux);
+	this->mux = NEM_svcmux_ref(mux);
 
 	if (new) {
 		NEM_chan_on_msg(&this->chan, NEM_thunk_new_ptr(

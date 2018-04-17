@@ -61,14 +61,14 @@ void NEM_txn_set_data(NEM_txn_t *this, void *data);
 void NEM_txn_cancel(NEM_txn_t *this);
 void NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err);
 
-// NEM_txnout_set_timeout sets the timeout in seconds for this transaction. Once
-// the period is expired, the transaction (and all children) are automatically
-// cancelled. This should be set on the top-level transaction -- when children
-// transactions are associated they make a copy of the parent's absolute
-// timeout value.
+// NEM_txnout_set_timeout sets the timeout in milliseconds for this transaction.
+// Once the period is expired, the transaction (and all children) are
+// automatically cancelled. This should be set on the top-level transaction --
+// when child transactions are associated they make a copy of the parent's
+// absolute timeout value.
 // 
-// Setting -1 seconds makes the timeout infinite.
-void NEM_txnout_set_timeout(NEM_txnout_t *this, int seconds);
+// Setting -1 milliseconds makes the timeout infinite.
+void NEM_txnout_set_timeout(NEM_txnout_t *this, int milliseconds);
 
 // NEM_txnin_reply finalizes the transaction and sends the provided message.
 // This invalidates the transaction object.

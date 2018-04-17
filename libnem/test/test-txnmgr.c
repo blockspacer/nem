@@ -123,8 +123,8 @@ work_init(work_t *work)
 	NEM_txnmgr_set_mux(&work->t_1, &work->svc_1);
 	NEM_txnmgr_set_mux(&work->t_2, &work->svc_2);
 
-	NEM_svcmux_decref(&work->svc_1);
-	NEM_svcmux_decref(&work->svc_2);
+	NEM_svcmux_unref(&work->svc_1);
+	NEM_svcmux_unref(&work->svc_2);
 }
 
 static void
@@ -152,7 +152,7 @@ START_TEST(set_mux)
 	NEM_svcmux_t mux;
 	NEM_svcmux_init(&mux);
 	NEM_txnmgr_set_mux(&work.t_1, &mux);
-	NEM_svcmux_decref(&mux);
+	NEM_svcmux_unref(&mux);
 	work_free(&work);
 }
 END_TEST

@@ -226,17 +226,132 @@ START_TEST(timer_ordering)
 }
 END_TEST
 
+START_TEST(timer_init_free)
+{
+	work_t work;
+	work_init(&work);
+	NEM_timer_t timer;
+	NEM_timer_init(&timer, &work.app, NEM_thunk_new(NULL, 0));
+	NEM_timer_free(&timer);
+	work_free(&work);
+}
+END_TEST
+
+START_TEST(timer_init_set_free)
+{
+	work_t work;
+	work_init(&work);
+	NEM_timer_t timer;
+	NEM_timer_init(&timer, &work.app, NEM_thunk_new(NULL, 0));
+	NEM_timer_set(&timer, 100);
+	NEM_timer_free(&timer);
+	work_free(&work);
+}
+END_TEST
+
+static void
+timer_set_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	work->ctr += 1;
+	NEM_app_stop(&work->app);
+}
+
+START_TEST(timer_set)
+{
+	work_t work;
+	work_init(&work);
+	NEM_timer_t timer;
+	NEM_timer_init(&timer, &work.app, NEM_thunk_new_ptr(
+		&timer_set_cb,
+		&work
+	));
+	NEM_timer_set(&timer, 10);
+	NEM_timer_set(&timer, 10);
+	NEM_timer_set(&timer, 10);
+	ck_err(NEM_app_run(&work.app));
+	NEM_timer_free(&timer);
+	work_free(&work);
+
+	ck_assert_int_eq(work.ctr, 1);
+}
+END_TEST
+
+static void
+timer_reset_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	work->ctr += 1;
+	NEM_timer_t *timer = varg;
+
+	if (work->ctr == 1) {
+		NEM_timer_set(timer, 10);
+	}
+	else {
+		NEM_app_stop(&work->app);
+	}
+}
+
+START_TEST(timer_reset)
+{
+	work_t work;
+	work_init(&work);
+	NEM_timer_t timer;
+	NEM_timer_init(&timer, &work.app, NEM_thunk_new_ptr(
+		&timer_reset_cb,
+		&work
+	));
+	NEM_timer_set(&timer, 10);
+	NEM_timer_set(&timer, 10);
+	ck_err(NEM_app_run(&work.app));
+	NEM_timer_free(&timer);
+	work_free(&work);
+
+	ck_assert_int_eq(work.ctr, 2);
+}
+END_TEST
+
+static void
+timer_cancel_cb(NEM_thunk1_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk1_ptr(thunk);
+	NEM_app_stop(&work->app);
+}
+
+START_TEST(timer_cancel)
+{
+	work_t work;
+	work_init(&work);
+	NEM_app_defer(&work.app, NEM_thunk1_new_ptr(&timer_cancel_cb, &work));
+	NEM_timer_t timer;
+	NEM_timer_init(&timer, &work.app, NEM_thunk_new(NULL, 0));
+	NEM_timer_cancel(&timer);
+	NEM_timer_set(&timer, 10);
+	NEM_timer_cancel(&timer);
+	ck_err(NEM_app_run(&work.app));
+	NEM_timer_free(&timer);
+	work_free(&work);
+
+	ck_assert_int_eq(work.ctr, 0);
+}
+END_TEST
+
 Suite*
 suite_app()
 {
 	tcase_t tests[] = {
-		{ "initroot_free",  &initroot_free  },
-		{ "run_stop_free",  &run_stop_free  },
-		{ "stop_run_free",  &stop_run_free  },
-		{ "defer_parallel", &defer_parallel },
-		{ "defer_chain",    &defer_chain    },
-		{ "defer_timer",    &defer_timer    },
-		{ "timer_ordering", &timer_ordering },
+		{ "initroot_free",       &initroot_free       },
+		{ "run_stop_free",       &run_stop_free       },
+		{ "stop_run_free",       &stop_run_free       },
+		{ "defer_parallel",      &defer_parallel      },
+		{ "defer_chain",         &defer_chain         },
+		{ "defer_timer",         &defer_timer         },
+		{ "timer_ordering",      &timer_ordering      },
+		{ "timer_init_free",     &timer_init_free     },
+		{ "timer_init_set_free", &timer_init_set_free },
+		{ "timer_set",           &timer_set           },
+		{ "timer_reset",         &timer_reset         },
+		{ "timer_cancel",        &timer_cancel        },
 	};
 
 	return tcase_build_suite("app", tests, sizeof(tests));

@@ -1,10 +1,10 @@
 #include "test.h"
 
-START_TEST(init_decref)
+START_TEST(init_unref)
 {
 	NEM_svcmux_t mux;
 	NEM_svcmux_init(&mux);
-	NEM_svcmux_decref(&mux);
+	NEM_svcmux_unref(&mux);
 }
 END_TEST
 
@@ -28,7 +28,7 @@ START_TEST(add_resolve)
 	ck_assert_ptr_eq(NEM_svcmux_resolve(&mux, 1, 2), thunks[1]);
 	ck_assert_ptr_eq(NEM_svcmux_resolve(&mux, 2, 1), thunks[2]);
 	ck_assert_ptr_eq(NEM_svcmux_resolve(&mux, 2, 2), NULL);
-	NEM_svcmux_decref(&mux);
+	NEM_svcmux_unref(&mux);
 }
 END_TEST
 
@@ -54,7 +54,7 @@ START_TEST(override)
 	ck_assert_ptr_eq(NEM_svcmux_resolve(&mux, 1, 1), thunks[0]);
 	ck_assert_ptr_eq(NEM_svcmux_resolve(&mux, 2, 1), thunks[2]);
 	ck_assert_ptr_eq(NEM_svcmux_resolve(&mux, 2, 2), NULL);
-	NEM_svcmux_decref(&mux);
+	NEM_svcmux_unref(&mux);
 }
 END_TEST
 
@@ -78,11 +78,11 @@ START_TEST(override_null)
 	NEM_svcmux_add_handlers(&mux, entries2, NEM_ARRSIZE(entries2));
 	ck_assert_ptr_eq(NEM_svcmux_resolve(&mux, 1, 1), thunks[0]);
 	ck_assert_ptr_eq(NEM_svcmux_resolve(&mux, 1, 2), NULL);
-	NEM_svcmux_decref(&mux);
+	NEM_svcmux_unref(&mux);
 }
 END_TEST
 
-START_TEST(copy)
+START_TEST(ref)
 {
 	NEM_svcmux_entry_t entries[] = {
 		{ 1, 1, NEM_thunk_new(NULL, 0) },
@@ -91,9 +91,9 @@ START_TEST(copy)
 	NEM_svcmux_t mux;
 	NEM_svcmux_init(&mux);
 	NEM_svcmux_add_handlers(&mux, entries, NEM_ARRSIZE(entries));
-	ck_assert_ptr_eq(&mux, NEM_svcmux_copy(&mux));
-	NEM_svcmux_decref(&mux);
-	NEM_svcmux_decref(&mux);
+	ck_assert_ptr_eq(&mux, NEM_svcmux_ref(&mux));
+	NEM_svcmux_unref(&mux);
+	NEM_svcmux_unref(&mux);
 }
 END_TEST
 
@@ -101,11 +101,11 @@ Suite*
 suite_svcmux()
 {
 	tcase_t tests[] = {
-		{ "init_decref",   &init_decref   },
+		{ "init_unref",    &init_unref    },
 		{ "add_resolve",   &add_resolve   },
 		{ "override",      &override      },
 		{ "override_null", &override_null },
-		{ "copy",          &copy          },
+		{ "ref",           &ref           },
 	};
 
 	return tcase_build_suite("svcmux", tests, sizeof(tests));

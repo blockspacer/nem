@@ -26,11 +26,8 @@ typedef struct {
 NEM_svcmux_t;
 
 // NEM_svcmux_init initializes a new NEM_svcmux_t with a refcount of 1.
-// After being passed to a NEM_txnmgr_t (or whatever) it should be decref'd.
+// After being passed to a NEM_txnmgr_t (or whatever) it should be unref'd.
 void NEM_svcmux_init(NEM_svcmux_t *this);
-
-// NEM_svcmux_copy increments the refcount for NEM_svcmux_t.
-NEM_svcmux_t* NEM_svcmux_copy(NEM_svcmux_t *this);
 
 // NEM_svcmux_add_handlers adds an array of handlers into the svcmux. Existing
 // svc/cmd handlers are overriden. If an entry has a NULL thunk, it removes an
@@ -42,9 +39,12 @@ void NEM_svcmux_add_handlers(
 	size_t              entries_len
 );
 
-// NEM_svcmux_decref decrements the refcount of the NEM_svcmux_t. When the
+// NEM_svcmux_ref increments the refcount for NEM_svcmux_t.
+NEM_svcmux_t* NEM_svcmux_ref(NEM_svcmux_t *this);
+
+// NEM_svcmux_unref decrements the refcount of the NEM_svcmux_t. When the
 // refcount is 0, the mux is freed.
-void NEM_svcmux_decref(NEM_svcmux_t *this);
+void NEM_svcmux_unref(NEM_svcmux_t *this);
 
 // NEM_svcmux_resolve returns the thunk associated with the specified 
 // svc_id/cmd_id.
