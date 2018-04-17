@@ -1,5 +1,7 @@
 #include "nem.h"
 
+static const int NEM_TXN_DEFAULT_TIMEOUT_MS = 15 * 1000;
+
 static void NEM_txnmgr_remove_txn(NEM_txnmgr_t *this, NEM_txn_t *txn);
 static void NEM_txnmgr_add_txn(NEM_txnmgr_t *this, NEM_txn_t *txn);
 static void NEM_txnmgr_set_timeout(
@@ -106,6 +108,10 @@ NEM_txn_free(NEM_txn_t *this)
 		NEM_msg_t *msg = this->messages[i];
 		if (NULL != msg) {
 			NEM_msg_free(msg);
+			this->messages[i] = NULL;
+		}
+		else {
+			NEM_panic("uhh what");
 		}
 	}
 	free(this->messages);
@@ -130,32 +136,53 @@ NEM_txn_set_data(NEM_txn_t *this, void *data)
 	this->data = data;
 }
 
-void
-NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err)
+static void
+NEM_txn_cancel_internal(NEM_txn_t *this, NEM_msg_t *msg, NEM_err_t err)
 {
-	NEM_txn_t **children = this->children;
-	size_t num_children = this->children_len;
-	this->children = NULL;
-	this->children_len = 0;
+	// NB: NEM_txn_cancel_err and this both call NEM_txn_cancel_internal
+	// on all children.
+	if (this->cancelled) {
+		return;
+	}
+
+	// NB: This cancels but does not free the underlying transaction.
+	// We can't actually free the transaction after giving it to the
+	// application code because they might have a dangling reference to
+	// it. Instead, flag it as 'cancelled' and just no-op all the
+	// operations against it.
 	this->cancelled = true;
 
-	for (size_t i = 0; i < num_children; i += 1) {
-		NEM_txn_cancel_err(children[i], err);
+	for (size_t i = 0; i < this->children_len; i += 1) {
+		NEM_txn_cancel_internal(this->children[i], NULL, err);
 	}
 
 	// XXX: If this is an outgoing transaction, we should tell the remote
-	// that we're not wanting anything else.
+	// that we're not wanting anything else. If this is an incoming
+	// transaction that we're cancelling, we should probably tell the 
+	// remote (since NEM_txn_cancel is called on our side by timeout,
+	// shutdown, or application code).
 
 	NEM_txn_ca ca = {
 		.err    = err,
 		.txnin  = (NEM_TXN_IN == this->type) ? (NEM_txnin_t*)this : NULL,
 		.txnout = (NEM_TXN_OUT == this->type) ? (NEM_txnout_t*)this : NULL,
 		.mgr    = this->mgr,
-		.msg    = NULL,
+		.msg    = msg,
 		.done   = true,
 	};
 	if (NULL != this->thunk) {
 		NEM_thunk_invoke(this->thunk, &ca);
+	}
+}
+
+void
+NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err)
+{
+	// NB: This is an exported function, so explicitly free.
+	NEM_txn_cancel_internal(this, NULL, err);
+
+	for (size_t i = 0; i < this->children_len; i += 1) {
+		NEM_txn_cancel_err(this->children[i], err);
 	}
 
 	NEM_txn_free(this);
@@ -167,9 +194,13 @@ NEM_txn_cancel(NEM_txn_t *this)
 	NEM_txn_cancel_err(this, NEM_err_static("transaction cancelled"));
 }
 
-void
-NEM_txnout_set_timeout(NEM_txnout_t *this, int ms)
+static void
+NEM_txn_set_timeout(NEM_txn_t *this, int ms)
 {
+	if (this->cancelled) {
+		return;
+	}
+
 	struct timeval new_time = {0};
 	if (-1 == ms) {
 		/* zero */
@@ -187,7 +218,19 @@ NEM_txnout_set_timeout(NEM_txnout_t *this, int ms)
 		new_time.tv_usec = new_time.tv_usec % (1000 * 1000);
 	}
 
-	NEM_txnmgr_set_timeout(this->base.mgr, &this->base, new_time);
+	NEM_txnmgr_set_timeout(this->mgr, this, new_time);
+}
+
+static void
+NEM_txnin_set_timeout(NEM_txnin_t *this, int ms)
+{
+	NEM_txn_set_timeout(&this->base, ms);
+}
+
+void
+NEM_txnout_set_timeout(NEM_txnout_t *this, int ms)
+{
+	NEM_txn_set_timeout(&this->base, ms);
 }
 
 void
@@ -242,8 +285,37 @@ NEM_txnin_reply_continue(NEM_txnin_t *this, NEM_msg_t *msg)
 void
 NEM_txnout_req(NEM_txnout_t *this, NEM_msg_t *msg)
 {
+	// XXX: Sending on a closed channel generates an error, right?
 	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
 	msg->packed.seq = this->base.seq;
+
+	if (!time_is_zero(this->base.timeout)) {
+		// Explicitly set timeout information.
+		struct timeval tv = {0};
+		gettimeofday(&tv, NULL);
+
+		int64_t remaining = 0;
+		remaining += (this->base.timeout.tv_sec - tv.tv_sec) * 1000;
+		remaining += (this->base.timeout.tv_usec - tv.tv_usec) / 1000;
+		if (0 > remaining) {
+			NEM_panic("already timed out"); // XXX: fix this.
+		}
+
+		// XXX: Could use a helper or something to simplify this, but it'd
+		// have to be a macro or something which is kind of gross.
+		NEM_msghdr_time_t timehdr = {
+			.timeout_ms = remaining,
+		};
+
+		NEM_msghdr_t *hdr = NEM_msg_header(msg);
+		NEM_msghdr_t new_hdr = {0};
+		if (NULL != hdr) {
+			new_hdr = *hdr;
+		}
+		new_hdr.time = &timehdr;
+		NEM_msg_set_header(msg, &new_hdr);
+		NEM_msghdr_free(hdr);
+	}
 
 	if (this->base.cancelled) {
 		done = true;
@@ -278,19 +350,23 @@ NEM_txnmgr_shutdown(NEM_txnmgr_t *this, NEM_err_t err)
 	NEM_txnin_t *txnin = NULL;
 	NEM_txnout_t *txnout = NULL;
 
-	// NB: The txn dtors wipe their own entries from the tree, so we don't
-	// need to worry about that.
-	while (NULL != (txnin = SPLAY_ROOT(&this->txns_in))) {
-		NEM_txn_cancel_err(&txnin->base, this->err);
+	// NB: shutdown happens when the underlying stream breaks. We can't
+	// really control when this happens, but there might be dangling refs
+	// to the bits and bobbles. Go through and cancel everything. This leaves
+	// the actual transactions intact (and in-tree) so they can be removed
+	// on free.
+	SPLAY_FOREACH(txnin, NEM_txnin_tree_t, &this->txns_in) {
+		NEM_txn_cancel_internal(&txnin->base, NULL, this->err);
 	}
-	while (NULL != (txnout = SPLAY_ROOT(&this->txns_out))) {
-		NEM_txn_cancel_err(&txnout->base, this->err);
+	SPLAY_FOREACH(txnout, NEM_txnout_tree_t, &this->txns_out) {
+		NEM_txn_cancel_internal(&txnout->base, NULL, this->err);
 	}
+	// NB: The timer tree is automatically cleared out when all the
+	// transactions are removed (since NEM_txn_free removes them from the
+	// timeout tree).
 
 	NEM_chan_free(&this->chan);
 	NEM_timer_free(&this->timer);
-
-	// XXX: Need to wipe out our timer tree.
 
 	if (NULL != this->mux) {
 		NEM_svcmux_unref(this->mux);
@@ -321,6 +397,10 @@ NEM_txnmgr_on_reply(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 		// what do we do.
 		return;
 	}
+	else if (txnout->base.cancelled) {
+		// We cancelled on our side; maybe we should notify the remote?
+		return;
+	}
 	if (NULL == txnout->base.thunk) {
 		// Uhh. What?
 		NEM_panic("NEM_txnmgr_on_reply: transaction has no handler?");
@@ -329,10 +409,12 @@ NEM_txnmgr_on_reply(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
 	NEM_err_t err = NEM_err_none;
 
+	// XXX: Should maybe claim the message here instead of below?
+
 	if ((msg->packed.flags & NEM_PMSGFLAG_CANCEL)) {
-		txnout->base.cancelled = true;
-		done = true;
 		err = NEM_err_static("remote cancelled transaction");
+		NEM_txn_cancel_internal(&txnout->base, msg, err);
+		return;
 	}
 
 	NEM_msghdr_t *hdr = NULL;
@@ -385,6 +467,12 @@ NEM_txnmgr_on_req(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 		&dummy
 	);
 	if (NULL != txnin) {
+		if (txnin->base.cancelled) {
+			// XXX: We might consider notifying the remote gratitously.
+			// NB: The message is still owned and freed by NEM_chan_t.
+			return;
+		}
+
 		msg->packed.service_id = txnin->service_id;
 		msg->packed.command_id = txnin->command_id;
 	}
@@ -426,16 +514,24 @@ NEM_txnmgr_on_req(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 		txnin->service_id = msg->packed.service_id;
 		txnin->command_id = msg->packed.command_id;
 		NEM_txnmgr_add_txn(this, &txnin->base);
+
+		NEM_msghdr_t *hdr = NEM_msg_header(msg);
+		if (NULL != hdr && NULL != hdr->time) {
+			NEM_txnin_set_timeout(txnin, hdr->time->timeout_ms);
+		}
+		NEM_msghdr_free(hdr);
 	}
 
 	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
 	NEM_err_t err = NEM_err_none;
 
+	// XXX: Maybe claim the message here?
+
 	if ((msg->packed.flags & NEM_PMSGFLAG_CANCEL)) {
 		// They're cancelling their request.
-		txnin->base.cancelled = true;
-		done = true;
 		err = NEM_err_static("remote cancelled transaction");
+		NEM_txn_cancel_internal(&txnin->base, msg, err);
+		return;
 	}
 
 	NEM_txn_ca ca = {
@@ -452,9 +548,6 @@ NEM_txnmgr_on_req(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 
 	// NB: The transaction doesn't get freed until the handler sends the
 	// final reply.
-	// XXX: We should probably set up a timeout here or something maybe? to
-	// automatically reply after a period? Maybe it's better to have all that
-	// logic on the client-side.
 }
 
 static void
@@ -475,12 +568,6 @@ NEM_txnmgr_on_msg(NEM_thunk_t *thunk, void *varg)
 	else {
 		NEM_txnmgr_on_req(this, ca);
 	}
-
-	// XXX: We should probably set a timeout here to detect failures
-	// to continue/reply.
-	
-	// XXX: We should probably check txnin->base.thunk here to ensure that
-	// the thing's been set up to process additional messages.
 }
 
 static void
@@ -503,10 +590,9 @@ NEM_txnmgr_on_timer(NEM_thunk_t *thunk, void *varg)
 	NEM_err_t err = NEM_err_static("transaction timeout");
 
 	while (NULL != (txn = SPLAY_MIN(NEM_txn_tree_t, &this->timeouts))) {
-		if (!time_is_less(txn->timeout, now)) {
-			// NB: This removes the transaction from the tree.
-			NEM_txn_cancel_err(txn, err);
-			break;
+		if (time_is_less(txn->timeout, now)) {
+			NEM_txn_cancel_internal(txn, NULL, err);
+			SPLAY_REMOVE(NEM_txn_tree_t, &this->timeouts, txn);
 		}
 	}
 
@@ -598,6 +684,19 @@ void
 NEM_txnmgr_free(NEM_txnmgr_t *this)
 {
 	NEM_txnmgr_shutdown(this, NEM_err_static("txnmgr freed"));
+
+	// NB: At this point, we're ensured that nothing is hanging on to txn
+	// pointers, so go through and remove any remaining transactions.
+	NEM_txnin_t *txnin = NULL;
+	NEM_txnout_t *txnout = NULL;
+
+	// NB: NEM_txn_free removes the bits from the tree.
+	while (NULL != (txnin = SPLAY_MIN(NEM_txnin_tree_t, &this->txns_in))) {
+		NEM_txn_free(&txnin->base);
+	}
+	while (NULL != (txnout = SPLAY_MIN(NEM_txnout_tree_t, &this->txns_out))) {
+		NEM_txn_free(&txnout->base);
+	}
 }
 
 void
@@ -627,12 +726,22 @@ NEM_txnmgr_req(NEM_txnmgr_t *this, NEM_txn_t *parent, NEM_thunk_t *thunk)
 	if (NULL == thunk) {
 		NEM_panic("NEM_txnmgr_req: cannot have a NULL thunk");
 	}
+	if (!NEM_err_ok(this->err)) {
+		NEM_panic("XXX need to handle the error here"); // XXX
+	}
 
 	NEM_txnout_t *txnout = NEM_malloc(sizeof(NEM_txnout_t));
 	txnout->base.type = NEM_TXN_OUT;
 	txnout->base.seq = ++this->seq;
 	txnout->base.thunk = thunk;
+	if (NULL != parent) {
+		txnout->base.timeout = parent->timeout;
+	}
 	NEM_txnmgr_add_txn(this, &txnout->base);
+
+	if (NULL == parent) {
+		NEM_txnout_set_timeout(txnout, NEM_TXN_DEFAULT_TIMEOUT_MS);
+	}
 
 	return txnout;
 }

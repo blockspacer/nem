@@ -76,10 +76,23 @@ const NEM_marshal_map_t NEM_msghdr_route_m = {
 };
 #undef TYPE
 
+#define TYPE NEM_msghdr_time_t
+static const NEM_marshal_field_t msghdr_time_fs[] = {
+	{ "timeout_ms", NEM_MARSHAL_UINT32, O(timeout_ms), -1, NULL },
+};
+const NEM_marshal_map_t NEM_msghdr_time_m = {
+	.fields     = msghdr_time_fs,
+	.fields_len = NEM_ARRSIZE(msghdr_time_fs),
+	.elem_size  = sizeof(TYPE),
+	.type_name  = NAME(TYPE),
+};
+#undef TYPE
+
 #define TYPE NEM_msghdr_t
 static const NEM_marshal_field_t msghdr_fs[] = {
 	{ "err",   NEM_MARSHAL_STRUCTPTR, O(err),   -1, &NEM_msghdr_err_m   },
 	{ "route", NEM_MARSHAL_STRUCTPTR, O(route), -1, &NEM_msghdr_route_m },
+	{ "time",  NEM_MARSHAL_STRUCTPTR, O(time),  -1, &NEM_msghdr_time_m  },
 };
 const NEM_marshal_map_t NEM_msghdr_m = {
 	.fields     = msghdr_fs,

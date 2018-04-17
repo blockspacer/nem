@@ -6,7 +6,9 @@ typedef struct {
 	NEM_txnmgr_t t_1, t_2;
 	NEM_svcmux_t svc_1, svc_2;
 	NEM_txnout_t *txnout;
+	NEM_txnin_t *txnin;
 	int ctr, ctr2;
+	int flags;
 }
 work_t;
 
@@ -92,6 +94,32 @@ work_svc_1_3(NEM_thunk_t *thunk, void *varg)
 }
 
 static void
+work_svc_1_4_cb(NEM_thunk1_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk1_ptr(thunk);
+	work->ctr += 10;
+
+	NEM_msg_t *msg = NEM_msg_new(0, 7);
+	memcpy(msg->body, "thanks", 7);
+	NEM_txnin_reply(work->txnin, msg);
+}
+
+static void
+work_svc_1_4(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_txn_ca *ca = varg;
+	work_t *work = NEM_thunk_ptr(thunk);
+	work->ctr += 1;
+	work->txnin = ca->txnin;
+	ck_err(ca->err);
+
+	NEM_app_after(&work->app, 100, NEM_thunk1_new_ptr(
+		&work_svc_1_4_cb,
+		work
+	));
+}
+
+static void
 work_init(work_t *work)
 {
 	bzero(work, sizeof(*work));
@@ -111,6 +139,7 @@ work_init(work_t *work)
 		{ 1, 1, NEM_thunk_new_ptr(&work_svc_1_1, work) },
 		{ 1, 2, NEM_thunk_new_ptr(&work_svc_1_2, work) },
 		{ 1, 3, NEM_thunk_new_ptr(&work_svc_1_3, work) },
+		{ 1, 4, NEM_thunk_new_ptr(&work_svc_1_4, work) },
 	};
 	NEM_svcmux_entry_t svcs_2[] = {
 	};
@@ -291,6 +320,41 @@ START_TEST(send_recv_1_3)
 END_TEST
 
 static void
+send_recv_1_4_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_txn_ca *ca = varg;
+	work->ctr2 += 1;
+
+	ck_err(ca->err);
+	ck_assert_ptr_ne(NULL, ca->msg);
+	ck_assert_int_eq(7, ca->msg->packed.body_len);
+	ck_assert_str_eq("thanks", ca->msg->body);
+	NEM_app_stop(&work->app);
+}
+
+START_TEST(send_recv_1_4)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
+	msg->packed.service_id = 1;
+	msg->packed.command_id = 4;
+
+	NEM_txnmgr_req1(&work.t_2, NULL, msg, NEM_thunk_new_ptr(
+		&send_recv_1_4_cb,
+		&work
+	));
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(work.ctr, 11);
+	ck_assert_int_eq(work.ctr2, 1);
+	work_free(&work);
+}
+END_TEST
+
+static void
 err_fd_closed_clisend_cb(NEM_thunk_t *thunk, void *varg)
 {
 	work_t *work = NEM_thunk_ptr(thunk);
@@ -418,6 +482,71 @@ START_TEST(err_send_invalid_cmd)
 }
 END_TEST
 
+static void
+err_timeout_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_txn_ca *ca = varg;
+	work->ctr2 += 1;
+
+	ck_assert(!NEM_err_ok(ca->err)); // NB: Should be a timeout.
+	ck_assert_ptr_eq(NULL, ca->msg);
+	ck_assert_ptr_eq(NULL, ca->txnin);
+	ck_assert_ptr_ne(NULL, ca->txnout);
+	ck_assert_ptr_ne(NULL, ca->mgr);
+	ck_assert(ca->done);
+
+	if (work->flags) {
+		// We got ca->done, so the transaction should be purged. Delay 
+		// stopping to ensure this doesn't get called again.
+		NEM_app_after(&work->app, 100, NEM_thunk1_new_ptr(
+			&work_stop_clean,
+			work
+		));
+	}
+	else {
+		NEM_app_stop(&work->app);
+	}
+}
+
+static void
+err_timeout_scaffold(bool delay)
+{
+	work_t work;
+	work_init(&work);
+	work.flags = delay ? 1 : 0;
+
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
+	msg->packed.service_id = 1;
+	msg->packed.command_id = 4;
+
+	NEM_txnout_t *txn = NEM_txnmgr_req(&work.t_2, NULL, NEM_thunk_new_ptr(
+		&err_timeout_cb,
+		&work
+	));
+	NEM_txnout_set_timeout(txn, 10);
+	NEM_txnout_req(txn, msg);
+
+	int off = delay ? 10 : 0; // Whether we waited for the svc to reply.
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(work.ctr, 1 + off);
+	ck_assert_int_eq(work.ctr2, 1);
+	work_free(&work);
+}
+
+START_TEST(err_timeout)
+{
+	err_timeout_scaffold(true);
+}
+END_TEST
+
+START_TEST(err_timeout_nodelay)
+{
+	err_timeout_scaffold(false);
+}
+END_TEST
+
 Suite*
 suite_txnmgr()
 {
@@ -427,9 +556,12 @@ suite_txnmgr()
 		{ "send_recv_1_1",         &send_recv_1_1         },
 		{ "send_recv_1_2",         &send_recv_1_2         },
 		{ "send_recv_1_3",         &send_recv_1_3         },
+		{ "send_recv_1_4",         &send_recv_1_4         },
 		{ "err_fd_closed_clisend", &err_fd_closed_clisend },
 		{ "err_fd_closed_srvsend", &err_fd_closed_srvsend },
 		{ "err_send_invalid_cmd",  &err_send_invalid_cmd  },
+		{ "err_timeout",           &err_timeout           },
+		{ "err_timeout_nodelay",   &err_timeout_nodelay   },
 	};
 
 	return tcase_build_suite("txnmgr", tests, sizeof(tests));

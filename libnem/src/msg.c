@@ -124,6 +124,9 @@ NEM_msghdr_t*
 NEM_msg_header(const NEM_msg_t *this)
 {
 	NEM_msghdr_t *hdr = NULL;
+	if (0 == this->packed.header_len) {
+		return NULL;
+	}
 
 	NEM_err_t err = NEM_msghdr_new(&hdr, this->header, this->packed.header_len);
 	if (!NEM_err_ok(err)) {

@@ -100,6 +100,33 @@ START_TEST(empty_string_null)
 }
 END_TEST
 
+START_TEST(overwrite_field)
+{
+	NEM_msghdr_time_t time_val = {
+		.timeout_ms = 42,
+	};
+	NEM_msghdr_t hdr_in = {
+		.time = &time_val,
+	};
+
+	NEM_msghdr_t *hdr_out = NULL;
+	void *bs;
+	size_t len;
+
+	ck_err(NEM_msghdr_pack(&hdr_in, &bs, &len));
+	ck_err(NEM_msghdr_new(&hdr_out, bs, len));
+	free(bs);
+
+	NEM_msghdr_t swap = {0};
+	swap = *hdr_out;
+	swap.time = &time_val;
+	
+	ck_err(NEM_msghdr_pack(&swap, &bs, &len));
+	free(bs);
+	NEM_msghdr_free(hdr_out);
+}
+END_TEST
+
 Suite*
 suite_msghdr()
 {
@@ -108,6 +135,7 @@ suite_msghdr()
 		{ "roundtrip_err",     &roundtrip_err     },
 		{ "roundtrip_route",   &roundtrip_route   },
 		{ "empty_string_null", &empty_string_null },
+		{ "overwrite_field",   &overwrite_field   },
 	};
 
 	return tcase_build_suite("msghdr", tests, sizeof(tests));
