@@ -317,6 +317,22 @@ NEM_timer_set(NEM_timer_t *this, uint64_t ms_after)
 }
 
 void
+NEM_timer_set_abs(NEM_timer_t *this, struct timeval tv)
+{
+	struct timeval now;
+	gettimeofday(&now, NULL);
+
+	// XXX: This is super hacky should probably fix this.
+	if (NULL == this->active) {
+		NEM_timer_set(this, 10);
+	}
+
+	SPLAY_REMOVE(NEM_timer1_tree_t, &this->app->timers, this->active);
+	this->active->invoke_at = tv;
+	NEM_app_insert_timer(this->app, this->active, now);
+}
+
+void
 NEM_timer_cancel(NEM_timer_t *this)
 {
 	if (NULL == this->active) {

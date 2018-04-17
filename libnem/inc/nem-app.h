@@ -69,6 +69,7 @@ void NEM_timer_init(NEM_timer_t *this, NEM_app_t *app, NEM_thunk_t *thunk);
 // NEM_timer_set updates the next firing time of the timer. If the timer is
 // already set to fire, the time is adjusted. If it isn't, it's scheduled.
 void NEM_timer_set(NEM_timer_t *this, uint64_t ms_after);
+void NEM_timer_set_abs(NEM_timer_t *this, struct timeval t);
 
 // NEM_timer_cancel cancels the next execution of the timer. If the timer
 // isn't set, this is a no-op.

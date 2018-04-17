@@ -99,8 +99,8 @@ work_init(work_t *work)
 
 	ck_err(NEM_fd_init_unix(&work->fd_1, &work->fd_2, work->app.kq));
 
-	NEM_txnmgr_init(&work->t_1, NEM_fd_as_stream(&work->fd_1));
-	NEM_txnmgr_init(&work->t_2, NEM_fd_as_stream(&work->fd_2));
+	NEM_txnmgr_init(&work->t_1, NEM_fd_as_stream(&work->fd_1), &work->app);
+	NEM_txnmgr_init(&work->t_2, NEM_fd_as_stream(&work->fd_2), &work->app);
 
 	NEM_app_after(&work->app, 3000, NEM_thunk1_new_ptr(
 		&work_stop_cb,

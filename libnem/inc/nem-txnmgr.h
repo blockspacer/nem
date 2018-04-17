@@ -14,6 +14,8 @@ NEM_txntype_t;
 // are hierarchical -- they can be bound to a parent transaction -- so that
 // cancelling the parent transaction propagates down to all children.
 struct NEM_txn_t {
+	SPLAY_ENTRY(NEM_txn_t) link;
+
 	uint64_t       seq;
 	struct timeval timeout;
 	NEM_txntype_t  type;
@@ -93,14 +95,17 @@ void NEM_txnout_req_continue(NEM_txnout_t *this, NEM_msg_t *msg);
 // NEM_txn*_tree_t is a tree of transactions, ordered by seqid.
 typedef SPLAY_HEAD(NEM_txnin_tree_t, NEM_txnin_t) NEM_txnin_tree_t;
 typedef SPLAY_HEAD(NEM_txnout_tree_t, NEM_txnout_t) NEM_txnout_tree_t;
+typedef SPLAY_HEAD(NEM_txn_tree_t, NEM_txn_t) NEM_txn_tree_t;
 
 // NEM_txnmgr_t wraps a NEM_chan_t and provides a transactional interface
 // over it. It handles assignment of sequence ids and can delegate request
 // dispatching.
 struct NEM_txnmgr_t {
 	NEM_chan_t        chan;
+	NEM_timer_t       timer;
 	NEM_txnin_tree_t  txns_in;
 	NEM_txnout_tree_t txns_out;
+	NEM_txn_tree_t    timeouts;
 	NEM_svcmux_t     *mux;
 	uint64_t          seq;
 	NEM_err_t         err;
@@ -109,7 +114,7 @@ struct NEM_txnmgr_t {
 // NEM_txnmgr_init initializes the txnmgr with the specified stream. The
 // stream becomes owned by this txnmgr and will be freed when the txnmgr
 // is closed.
-void NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream);
+void NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream, NEM_app_t *app);
 void NEM_txnmgr_free(NEM_txnmgr_t *this);
 
 // NEM_txnmgr_set_mux replaces the existing mux with the specified one.

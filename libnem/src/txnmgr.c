@@ -1,13 +1,40 @@
 #include "nem.h"
 
-static void NEM_txnmgr_remove_txn(NEM_txnmgr_t *mgr, NEM_txn_t *txn);
+static void NEM_txnmgr_remove_txn(NEM_txnmgr_t *this, NEM_txn_t *txn);
+static void NEM_txnmgr_add_txn(NEM_txnmgr_t *this, NEM_txn_t *txn);
+static void NEM_txnmgr_set_timeout(
+	NEM_txnmgr_t  *this,
+	NEM_txn_t     *txn,
+	struct timeval t
+);
 
 static inline int NEM_txn_cmp(const void *lhs, const void *rhs);
+static inline int NEM_txn_cmp_timeout(const void *lhs, const void *rhs);
 
 SPLAY_PROTOTYPE(NEM_txnin_tree_t, NEM_txnin_t, link, NEM_txn_cmp);
 SPLAY_GENERATE(NEM_txnin_tree_t, NEM_txnin_t, link, NEM_txn_cmp);
 SPLAY_PROTOTYPE(NEM_txnout_tree_t, NEM_txnout_t, link, NEM_txn_cmp);
 SPLAY_GENERATE(NEM_txnout_tree_t, NEM_txnout_t, link, NEM_txn_cmp);
+SPLAY_PROTOTYPE(NEM_txn_tree_t, NEM_txn_t, link, NEM_txn_cmp_timeout);
+SPLAY_GENERATE(NEM_txn_tree_t, NEM_txn_t, link, NEM_txn_cmp_timeout);
+
+static inline bool
+time_is_zero(struct timeval t)
+{
+	return 0 == t.tv_sec && 0 == t.tv_usec;
+}
+
+static inline bool
+time_is_less(struct timeval t1, struct timeval t2) {
+	if (t1.tv_sec < t2.tv_sec) {
+		return true;
+	}
+	else if (t1.tv_sec == t2.tv_sec && t1.tv_usec < t2.tv_usec) {
+		return true;
+	}
+
+	return false;
+}
 
 static inline int
 NEM_txn_cmp(const void *vlhs, const void *vrhs)
@@ -24,6 +51,28 @@ NEM_txn_cmp(const void *vlhs, const void *vrhs)
 	else {
 		return 0;
 	}
+}
+
+static inline int
+NEM_txn_cmp_timeout(const void *vlhs, const void *vrhs)
+{
+	const NEM_txn_t *lhs = vlhs;
+	const NEM_txn_t *rhs = vrhs;
+
+	if (lhs->timeout.tv_sec < rhs->timeout.tv_sec) {
+		return -1;
+	}
+	else if (lhs->timeout.tv_sec > rhs->timeout.tv_sec) {
+		return 1;
+	}
+	else if (lhs->timeout.tv_usec < rhs->timeout.tv_usec) {
+		return -1;
+	}
+	else if (lhs->timeout.tv_usec > rhs->timeout.tv_usec) {
+		return 1;
+	}
+	
+	return 0;
 }
 
 static void
@@ -88,10 +137,14 @@ NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err)
 	size_t num_children = this->children_len;
 	this->children = NULL;
 	this->children_len = 0;
+	this->cancelled = true;
 
 	for (size_t i = 0; i < num_children; i += 1) {
 		NEM_txn_cancel_err(children[i], err);
 	}
+
+	// XXX: If this is an outgoing transaction, we should tell the remote
+	// that we're not wanting anything else.
 
 	NEM_txn_ca ca = {
 		.err    = err,
@@ -117,22 +170,24 @@ NEM_txn_cancel(NEM_txn_t *this)
 void
 NEM_txnout_set_timeout(NEM_txnout_t *this, int ms)
 {
+	struct timeval new_time = {0};
 	if (-1 == ms) {
-		bzero(&this->base.timeout, sizeof(this->base.timeout));
-		return;
+		/* zero */
 	}
-	if (ms < 0) {
+	else if (0 > ms) {
 		NEM_panic("NEM_txnout_set_timeout: invalid number of ms");
 	}
+	else {
+		gettimeofday(&new_time, NULL);
+		new_time.tv_sec += ms / 1000;
+		new_time.tv_usec += (ms % 1000) * 1000;
 
-	struct timeval *t = &this->base.timeout;
-	gettimeofday(t, NULL);
-	t->tv_sec += ms / 1000;
-	t->tv_usec += (ms % 1000) * 1000;
+		// NB: Handle overflow for canonicalized values.
+		new_time.tv_sec += new_time.tv_usec / (1000 * 1000);
+		new_time.tv_usec = new_time.tv_usec % (1000 * 1000);
+	}
 
-	// NB: Handle overflow for canonicalized values.
-	t->tv_sec += t->tv_usec / (1000 * 1000);
-	t->tv_usec = t->tv_usec % (1000 * 1000);
+	NEM_txnmgr_set_timeout(this->base.mgr, &this->base, new_time);
 }
 
 void
@@ -233,6 +288,9 @@ NEM_txnmgr_shutdown(NEM_txnmgr_t *this, NEM_err_t err)
 	}
 
 	NEM_chan_free(&this->chan);
+	NEM_timer_free(&this->timer);
+
+	// XXX: Need to wipe out our timer tree.
 
 	if (NULL != this->mux) {
 		NEM_svcmux_unref(this->mux);
@@ -364,11 +422,10 @@ NEM_txnmgr_on_req(NEM_txnmgr_t *this, NEM_chan_ca *chan_ca)
 
 		txnin = NEM_malloc(sizeof(NEM_txnin_t));
 		txnin->base.seq = msg->packed.seq;
-		txnin->base.mgr = this;
 		txnin->base.type = NEM_TXN_IN;
 		txnin->service_id = msg->packed.service_id;
 		txnin->command_id = msg->packed.command_id;
-		SPLAY_INSERT(NEM_txnin_tree_t, &this->txns_in, txnin);
+		NEM_txnmgr_add_txn(this, &txnin->base);
 	}
 
 	bool done = 0 == (msg->packed.flags & NEM_PMSGFLAG_CONTINUE);
@@ -434,10 +491,38 @@ NEM_txnmgr_on_close(NEM_thunk1_t *thunk, void *varg)
 	NEM_txnmgr_shutdown(this, ca->err);
 }
 
+static void
+NEM_txnmgr_on_timer(NEM_thunk_t *thunk, void *varg)
+{
+	NEM_txnmgr_t *this = NEM_thunk_ptr(thunk);
+
+	struct timeval now;
+	gettimeofday(&now, NULL);
+
+	NEM_txn_t *txn = NULL;
+	NEM_err_t err = NEM_err_static("transaction timeout");
+
+	while (NULL != (txn = SPLAY_MIN(NEM_txn_tree_t, &this->timeouts))) {
+		if (!time_is_less(txn->timeout, now)) {
+			// NB: This removes the transaction from the tree.
+			NEM_txn_cancel_err(txn, err);
+			break;
+		}
+	}
+
+	if (NULL != txn) {
+		NEM_timer_set_abs(&this->timer, txn->timeout);
+	}
+}
+
 void
-NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream)
+NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream, NEM_app_t *app)
 {
 	NEM_chan_init(&this->chan, stream);
+	NEM_timer_init(&this->timer, app, NEM_thunk_new_ptr(
+		&NEM_txnmgr_on_timer,
+		this
+	));
 	SPLAY_INIT(&this->txns_in);
 	SPLAY_INIT(&this->txns_out);
 	this->mux = NULL;
@@ -457,6 +542,49 @@ NEM_txnmgr_remove_txn(NEM_txnmgr_t *this, NEM_txn_t *txn)
 	}
 	else {
 		SPLAY_REMOVE(NEM_txnout_tree_t, &this->txns_out, (NEM_txnout_t*) txn);
+	}
+
+	if (!time_is_zero(txn->timeout)) {
+		SPLAY_REMOVE(NEM_txn_tree_t, &this->timeouts, txn);
+	}
+}
+
+static void
+NEM_txnmgr_add_txn(NEM_txnmgr_t *this, NEM_txn_t *txn)
+{
+	txn->mgr = this;
+
+	if (NEM_TXN_IN == txn->type) {
+		SPLAY_INSERT(NEM_txnin_tree_t, &this->txns_in, (NEM_txnin_t*) txn);
+	}
+	else {
+		SPLAY_INSERT(NEM_txnout_tree_t, &this->txns_out, (NEM_txnout_t*) txn);
+	}
+
+	if (!time_is_zero(txn->timeout)) {
+		SPLAY_INSERT(NEM_txn_tree_t, &this->timeouts, txn);
+		if (txn == SPLAY_MIN(NEM_txn_tree_t, &this->timeouts)) {
+			NEM_timer_set_abs(&this->timer, txn->timeout);
+		}
+	}
+}
+
+static void
+NEM_txnmgr_set_timeout(NEM_txnmgr_t *this, NEM_txn_t *txn, struct timeval t)
+{
+	if (!time_is_zero(txn->timeout)) {
+		SPLAY_REMOVE(NEM_txn_tree_t, &this->timeouts, txn);
+	}
+
+	txn->timeout = t;
+
+	if (!time_is_zero(txn->timeout)) {
+		SPLAY_INSERT(NEM_txn_tree_t, &this->timeouts, txn);
+	}
+
+	NEM_txn_t *min = SPLAY_MIN(NEM_txn_tree_t, &this->timeouts);
+	if (NULL != min) {
+		NEM_timer_set_abs(&this->timer, min->timeout);
 	}
 }
 
@@ -501,12 +629,10 @@ NEM_txnmgr_req(NEM_txnmgr_t *this, NEM_txn_t *parent, NEM_thunk_t *thunk)
 	}
 
 	NEM_txnout_t *txnout = NEM_malloc(sizeof(NEM_txnout_t));
-	txnout->base.mgr = this;
 	txnout->base.type = NEM_TXN_OUT;
 	txnout->base.seq = ++this->seq;
 	txnout->base.thunk = thunk;
-
-	SPLAY_INSERT(NEM_txnout_tree_t, &this->txns_out, txnout);
+	NEM_txnmgr_add_txn(this, &txnout->base);
 
 	return txnout;
 }
