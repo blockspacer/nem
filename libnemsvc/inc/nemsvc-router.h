@@ -1,5 +1,10 @@
 #pragma once
 
+static const uint16_t
+	NEM_cmdid_router_bind          = 1,
+	NEM_cmdid_router_register_svc  = 2,
+	NEM_cmdid_router_register_http = 3;
+
 // NEM_svc_router_bind_t is a request that passes a FD to the router 
 // daemon to accept against. The router daemon shouldn't bind any sockets
 // itself; instead it should just get the FDs via this message from
