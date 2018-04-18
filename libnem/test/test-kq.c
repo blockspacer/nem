@@ -1,7 +1,7 @@
 #include "test.h"
 
 typedef struct {
-	NEM_app_t app;
+	NEM_kq_t kq;
 	int ctr;
 }
 work_t;
@@ -10,20 +10,20 @@ static void
 work_init(work_t *work)
 {
 	bzero(work, sizeof(*work));
-	NEM_app_init_root(&work->app);
+	NEM_kq_init_root(&work->kq);
 }
 
 static void
 work_free(work_t *work)
 {
-	NEM_app_free(&work->app);
+	NEM_kq_free(&work->kq);
 }
 
 static void
 work_stop(NEM_thunk1_t *thunk, void *varg)
 {
 	work_t *work = NEM_thunk1_ptr(thunk);
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 START_TEST(initroot_free)
@@ -39,11 +39,11 @@ START_TEST(run_stop_free)
 	work_t work;
 	work_init(&work);
 
-	NEM_app_defer(&work.app, NEM_thunk1_new_ptr(
+	NEM_kq_defer(&work.kq, NEM_thunk1_new_ptr(
 		&work_stop,
 		&work
 	));
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 
 	work_free(&work);
 }
@@ -54,8 +54,8 @@ START_TEST(stop_run_free)
 	work_t work;
 	work_init(&work);
 
-	NEM_app_stop(&work.app);
-	ck_err(NEM_app_run(&work.app));
+	NEM_kq_stop(&work.kq);
+	ck_err(NEM_kq_run(&work.kq));
 
 	work_free(&work);
 }
@@ -68,7 +68,7 @@ defer_parallel_cb(NEM_thunk1_t *thunk, void *vargs)
 	work->ctr += 1;
 
 	if (work->ctr == 5) {
-		NEM_app_stop(&work->app);
+		NEM_kq_stop(&work->kq);
 	}
 }
 
@@ -78,13 +78,13 @@ START_TEST(defer_parallel)
 	work_init(&work);
 
 	for (size_t i = 0; i < 5; i += 1) {
-		NEM_app_defer(&work.app, NEM_thunk1_new_ptr(
+		NEM_kq_defer(&work.kq, NEM_thunk1_new_ptr(
 			&defer_parallel_cb,
 			&work
 		));
 	}
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 5);
 
 	work_free(&work);
@@ -98,10 +98,10 @@ defer_chain_cb(NEM_thunk1_t *thunk, void *vargs)
 	work->ctr += 1;
 
 	if (work->ctr == 10) {
-		NEM_app_stop(&work->app);
+		NEM_kq_stop(&work->kq);
 	}
 	else {
-		NEM_app_defer(&work->app, NEM_thunk1_new_ptr(
+		NEM_kq_defer(&work->kq, NEM_thunk1_new_ptr(
 			&defer_chain_cb,
 			work
 		));
@@ -113,12 +113,12 @@ START_TEST(defer_chain)
 	work_t work;
 	work_init(&work);
 
-	NEM_app_defer(&work.app, NEM_thunk1_new_ptr(
+	NEM_kq_defer(&work.kq, NEM_thunk1_new_ptr(
 		&defer_chain_cb,
 		&work
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 10);
 
 	work_free(&work);
@@ -131,7 +131,7 @@ defer_timer_timer_cb(NEM_thunk1_t *thunk, void *varg)
 	work_t *work = NEM_thunk1_ptr(thunk);
 	ck_assert_int_eq(1, work->ctr);
 	work->ctr += 1;
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 static void
@@ -147,17 +147,17 @@ START_TEST(defer_timer)
 	work_t work;
 	work_init(&work);
 
-	NEM_app_after(&work.app, 10, NEM_thunk1_new_ptr(
+	NEM_kq_after(&work.kq, 10, NEM_thunk1_new_ptr(
 		&defer_timer_timer_cb,
 		&work
 	));
 
-	NEM_app_defer(&work.app, NEM_thunk1_new_ptr(
+	NEM_kq_defer(&work.kq, NEM_thunk1_new_ptr(
 		&defer_timer_defer_cb,
 		&work
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 2);
 
 	work_free(&work);
@@ -179,7 +179,7 @@ timer_ordering_n(NEM_thunk1_t *thunk, void *varg)
 	ord->work->ctr += 1;
 
 	if (ord->stop) {
-		NEM_app_stop(&ord->work->app);
+		NEM_kq_stop(&ord->work->kq);
 	}
 }
 
@@ -193,7 +193,7 @@ START_TEST(timer_ordering)
 		.n    = 0,
 	};
 
-	NEM_app_after(&work.app, 10, NEM_thunk1_new_ptr(
+	NEM_kq_after(&work.kq, 10, NEM_thunk1_new_ptr(
 		&timer_ordering_n,
 		&ord10
 	));
@@ -203,7 +203,7 @@ START_TEST(timer_ordering)
 		.n    = 2,
 	};
 
-	NEM_app_after(&work.app, 40, NEM_thunk1_new_ptr(
+	NEM_kq_after(&work.kq, 40, NEM_thunk1_new_ptr(
 		&timer_ordering_n,
 		&ord30
 	));
@@ -214,12 +214,12 @@ START_TEST(timer_ordering)
 		.stop = true,
 	};
 
-	NEM_app_after(&work.app, 20, NEM_thunk1_new_ptr(
+	NEM_kq_after(&work.kq, 20, NEM_thunk1_new_ptr(
 		&timer_ordering_n,
 		&ord20
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 2);
 
 	work_free(&work);
@@ -231,7 +231,7 @@ START_TEST(timer_init_free)
 	work_t work;
 	work_init(&work);
 	NEM_timer_t timer;
-	NEM_timer_init(&timer, &work.app, NEM_thunk_new(NULL, 0));
+	NEM_timer_init(&timer, &work.kq, NEM_thunk_new(NULL, 0));
 	NEM_timer_free(&timer);
 	work_free(&work);
 }
@@ -242,7 +242,7 @@ START_TEST(timer_init_set_free)
 	work_t work;
 	work_init(&work);
 	NEM_timer_t timer;
-	NEM_timer_init(&timer, &work.app, NEM_thunk_new(NULL, 0));
+	NEM_timer_init(&timer, &work.kq, NEM_thunk_new(NULL, 0));
 	NEM_timer_set(&timer, 100);
 	NEM_timer_free(&timer);
 	work_free(&work);
@@ -254,7 +254,7 @@ timer_set_cb(NEM_thunk_t *thunk, void *varg)
 {
 	work_t *work = NEM_thunk_ptr(thunk);
 	work->ctr += 1;
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 START_TEST(timer_set)
@@ -262,14 +262,14 @@ START_TEST(timer_set)
 	work_t work;
 	work_init(&work);
 	NEM_timer_t timer;
-	NEM_timer_init(&timer, &work.app, NEM_thunk_new_ptr(
+	NEM_timer_init(&timer, &work.kq, NEM_thunk_new_ptr(
 		&timer_set_cb,
 		&work
 	));
 	NEM_timer_set(&timer, 10);
 	NEM_timer_set(&timer, 10);
 	NEM_timer_set(&timer, 10);
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	NEM_timer_free(&timer);
 	work_free(&work);
 
@@ -288,7 +288,7 @@ timer_reset_cb(NEM_thunk_t *thunk, void *varg)
 		NEM_timer_set(timer, 10);
 	}
 	else {
-		NEM_app_stop(&work->app);
+		NEM_kq_stop(&work->kq);
 	}
 }
 
@@ -297,13 +297,13 @@ START_TEST(timer_reset)
 	work_t work;
 	work_init(&work);
 	NEM_timer_t timer;
-	NEM_timer_init(&timer, &work.app, NEM_thunk_new_ptr(
+	NEM_timer_init(&timer, &work.kq, NEM_thunk_new_ptr(
 		&timer_reset_cb,
 		&work
 	));
 	NEM_timer_set(&timer, 10);
 	NEM_timer_set(&timer, 10);
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	NEM_timer_free(&timer);
 	work_free(&work);
 
@@ -315,20 +315,20 @@ static void
 timer_cancel_cb(NEM_thunk1_t *thunk, void *varg)
 {
 	work_t *work = NEM_thunk1_ptr(thunk);
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 START_TEST(timer_cancel)
 {
 	work_t work;
 	work_init(&work);
-	NEM_app_defer(&work.app, NEM_thunk1_new_ptr(&timer_cancel_cb, &work));
+	NEM_kq_defer(&work.kq, NEM_thunk1_new_ptr(&timer_cancel_cb, &work));
 	NEM_timer_t timer;
-	NEM_timer_init(&timer, &work.app, NEM_thunk_new(NULL, 0));
+	NEM_timer_init(&timer, &work.kq, NEM_thunk_new(NULL, 0));
 	NEM_timer_cancel(&timer);
 	NEM_timer_set(&timer, 10);
 	NEM_timer_cancel(&timer);
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	NEM_timer_free(&timer);
 	work_free(&work);
 
@@ -337,7 +337,7 @@ START_TEST(timer_cancel)
 END_TEST
 
 Suite*
-suite_app()
+suite_kq()
 {
 	tcase_t tests[] = {
 		{ "initroot_free",       &initroot_free       },
@@ -354,5 +354,5 @@ suite_app()
 		{ "timer_cancel",        &timer_cancel        },
 	};
 
-	return tcase_build_suite("app", tests, sizeof(tests));
+	return tcase_build_suite("kq", tests, sizeof(tests));
 }

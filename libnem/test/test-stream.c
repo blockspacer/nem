@@ -1,7 +1,7 @@
 #include "test.h"
 
 typedef struct {
-	NEM_app_t app;
+	NEM_kq_t kq;
 	NEM_stream_t s_1;
 	NEM_stream_t s_2;
 	NEM_fd_t  fd_1;
@@ -18,7 +18,7 @@ static void
 work_stop_cb(NEM_thunk1_t *thunk, void *varg)
 {
 	work_t *work = NEM_thunk1_ptr(thunk);
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 	ck_assert_msg(false, "too long");
 }
 
@@ -26,13 +26,13 @@ static void
 work_init(work_t *work, fd_init_fn fn)
 {
 	bzero(work, sizeof(*work));
-	ck_err(NEM_app_init_root(&work->app));
-	ck_err(fn(&work->fd_1, &work->fd_2, work->app.kq));
+	ck_err(NEM_kq_init_root(&work->kq));
+	ck_err(fn(&work->fd_1, &work->fd_2, work->kq.kq));
 
 	work->s_1 = NEM_fd_as_stream(&work->fd_1);
 	work->s_2 = NEM_fd_as_stream(&work->fd_2);
 	
-	NEM_app_after(&work->app, 3000, NEM_thunk1_new_ptr(
+	NEM_kq_after(&work->kq, 3000, NEM_thunk1_new_ptr(
 		&work_stop_cb,
 		work
 	));
@@ -47,7 +47,7 @@ work_free(work_t *work)
 	if (!work->fds_freed[1]) {
 		NEM_fd_free(&work->fd_2);
 	}
-	NEM_app_free(&work->app);
+	NEM_kq_free(&work->kq);
 }
 
 #define DEFINE_TESTS(fn) \
@@ -75,7 +75,7 @@ write_once_rcb(NEM_thunk1_t *thunk, void *varg)
 
 	work_t *work = NEM_thunk1_ptr(thunk);
 	ck_assert_str_eq("hello", work->bufs[0]);
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 static void
@@ -106,7 +106,7 @@ write_once(fd_init_fn fn)
 		&called
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_str_eq("hello", work.bufs[0]);
 	ck_assert(called);
 
@@ -152,7 +152,7 @@ echo_wcb(NEM_thunk1_t *thunk, void *varg)
 	else {
 		work->state[1] = 2;
 		ck_assert_str_eq("hello", work->bufs[1]);
-		NEM_app_stop(&work->app);
+		NEM_kq_stop(&work->kq);
 	}
 }
 
@@ -174,7 +174,7 @@ echo(fd_init_fn fn)
 		&work
 	)));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_str_eq("hello", work.bufs[0]);
 	ck_assert_str_eq("hello", work.bufs[1]);
 	ck_assert_int_eq(1, work.state[0]);
@@ -192,7 +192,7 @@ err_read_closed_cb(NEM_thunk1_t *thunk, void *varg)
 	ck_assert(!NEM_err_ok(ca->err));
 
 	work->state[0] = 1;
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 static void
@@ -209,7 +209,7 @@ err_read_closed(fd_init_fn fn)
 
 	ck_err(NEM_stream_close(work.s_2));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(1, work.state[0]);
 
 	work_free(&work);

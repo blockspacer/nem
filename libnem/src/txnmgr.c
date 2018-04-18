@@ -603,10 +603,10 @@ NEM_txnmgr_on_timer(NEM_thunk_t *thunk, void *varg)
 }
 
 void
-NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream, NEM_app_t *app)
+NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream, NEM_kq_t *kq)
 {
 	NEM_chan_init(&this->chan, stream);
-	NEM_timer_init(&this->timer, app, NEM_thunk_new_ptr(
+	NEM_timer_init(&this->timer, kq, NEM_thunk_new_ptr(
 		&NEM_txnmgr_on_timer,
 		this
 	));

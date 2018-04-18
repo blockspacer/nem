@@ -114,7 +114,7 @@ struct NEM_txnmgr_t {
 // NEM_txnmgr_init initializes the txnmgr with the specified stream. The
 // stream becomes owned by this txnmgr and will be freed when the txnmgr
 // is closed.
-void NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream, NEM_app_t *app);
+void NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream, NEM_kq_t *kq);
 void NEM_txnmgr_free(NEM_txnmgr_t *this);
 
 // NEM_txnmgr_set_mux replaces the existing mux with the specified one.

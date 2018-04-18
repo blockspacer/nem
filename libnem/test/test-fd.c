@@ -1,10 +1,10 @@
 #include "test.h"
 
 typedef struct {
-	int kq;
+	int kq_fd;
 	int fds[2];
 	char *buf;
-	NEM_app_t app;
+	NEM_kq_t kq;
 	bool fds_freed[2];
 }
 work_t;
@@ -13,8 +13,8 @@ static void
 work_init(work_t *work)
 {
 	bzero(work, sizeof(*work));
-	work->kq = kqueue();
-	ck_assert_int_ne(-1, work->kq);
+	work->kq_fd = kqueue();
+	ck_assert_int_ne(-1, work->kq_fd);
 	ck_assert_int_eq(0, pipe2(work->fds, O_CLOEXEC));
 }
 
@@ -35,7 +35,7 @@ work_free(work_t *work)
 		ck_assert_int_eq(0, close(work->fds[1]));
 	}
 
-	ck_assert_int_eq(0, close(work->kq));
+	ck_assert_int_eq(0, close(work->kq_fd));
 }
 
 START_TEST(init_free)
@@ -44,7 +44,7 @@ START_TEST(init_free)
 	work_init(&work);
 
 	NEM_fd_t fd;
-	ck_err(NEM_fd_init(&fd, work.kq, work.fds[0]));
+	ck_err(NEM_fd_init(&fd, work.kq_fd, work.fds[0]));
 	NEM_fd_free(&fd);
 
 	work.fds_freed[0] = true;
@@ -58,7 +58,7 @@ START_TEST(init_close_free)
 	work_init(&work);
 
 	NEM_fd_t fd;
-	ck_err(NEM_fd_init(&fd, work.kq, work.fds[0]));
+	ck_err(NEM_fd_init(&fd, work.kq_fd, work.fds[0]));
 	NEM_fd_close(&fd);
 
 	work.fds_freed[0] = true;
@@ -88,7 +88,7 @@ START_TEST(err_init_invalid_fd)
 	work_init(&work);
 
 	NEM_fd_t fd;
-	NEM_err_t err = NEM_fd_init(&fd, work.kq, -1);
+	NEM_err_t err = NEM_fd_init(&fd, work.kq_fd, -1);
 	ck_assert(!NEM_err_ok(err));
 
 	work_free(&work);
@@ -101,7 +101,7 @@ START_TEST(init2_free)
 	work_init(&work);
 
 	NEM_fd_t fd;
-	ck_err(NEM_fd_init2(&fd, work.kq, work.fds[0], work.fds[1]));
+	ck_err(NEM_fd_init2(&fd, work.kq_fd, work.fds[0], work.fds[1]));
 	NEM_fd_free(&fd);
 
 	work.fds_freed[0] = true;
@@ -116,7 +116,7 @@ START_TEST(init2_close_free)
 	work_init(&work);
 
 	NEM_fd_t fd;
-	ck_err(NEM_fd_init2(&fd, work.kq, work.fds[0], work.fds[1]));
+	ck_err(NEM_fd_init2(&fd, work.kq_fd, work.fds[0], work.fds[1]));
 	NEM_fd_close(&fd);
 
 	work.fds_freed[0] = true;
@@ -148,7 +148,7 @@ START_TEST(err_init2_invalid_fd1)
 	work_init(&work);
 
 	NEM_fd_t fd;
-	NEM_err_t err = NEM_fd_init2(&fd, work.kq, -1, work.fds[0]);
+	NEM_err_t err = NEM_fd_init2(&fd, work.kq_fd, -1, work.fds[0]);
 	ck_assert(!NEM_err_ok(err));
 
 	work.fds_freed[0] = true;
@@ -162,7 +162,7 @@ START_TEST(err_init2_invalid_fd2)
 	work_init(&work);
 
 	NEM_fd_t fd;
-	NEM_err_t err = NEM_fd_init2(&fd, work.kq, work.fds[0], -1);
+	NEM_err_t err = NEM_fd_init2(&fd, work.kq_fd, work.fds[0], -1);
 	ck_assert(!NEM_err_ok(err));
 
 	work.fds_freed[0] = true;
@@ -179,7 +179,7 @@ read_1_cb(NEM_thunk1_t *thunk, void *varg)
 	ck_err(ca->err);
 	ck_assert_str_eq("hello", work->buf);
 
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 START_TEST(read_1)
@@ -187,10 +187,10 @@ START_TEST(read_1)
 	work_t work;
 	work_init(&work);
 
-	NEM_app_init_root(&work.app);
+	NEM_kq_init_root(&work.kq);
 
 	NEM_fd_t fd;
-	ck_err(NEM_fd_init(&fd, work.app.kq, work.fds[0]));
+	ck_err(NEM_fd_init(&fd, work.kq.kq, work.fds[0]));
 	work.fds_freed[0] = true;
 
 	ck_assert_int_eq(6, write(work.fds[1], "hello", 6));
@@ -201,9 +201,9 @@ START_TEST(read_1)
 		&work
 	)));
 
-	NEM_app_run(&work.app);
+	NEM_kq_run(&work.kq);
 	NEM_fd_free(&fd);
-	NEM_app_free(&work.app);
+	NEM_kq_free(&work.kq);
 
 	work_free(&work);
 }
@@ -230,10 +230,10 @@ START_TEST(err_read_interleaved)
 	work_t work;
 	work_init(&work);
 
-	NEM_app_init_root(&work.app);
+	NEM_kq_init_root(&work.kq);
 
 	NEM_fd_t fd;
-	ck_err(NEM_fd_init(&fd, work.app.kq, work.fds[0]));
+	ck_err(NEM_fd_init(&fd, work.kq.kq, work.fds[0]));
 	work.fds_freed[0] = true;
 
 	work.buf = alloca(12);
@@ -252,7 +252,7 @@ START_TEST(err_read_interleaved)
 	ck_assert(!NEM_err_ok(err));
 
 	NEM_fd_free(&fd);
-	NEM_app_free(&work.app);
+	NEM_kq_free(&work.kq);
 	work_free(&work);
 
 	ck_assert(called);
@@ -264,10 +264,10 @@ START_TEST(err_read_closed)
 	work_t work;
 	work_init(&work);
 
-	NEM_app_init_root(&work.app);
+	NEM_kq_init_root(&work.kq);
 
 	NEM_fd_t fd;
-	ck_err(NEM_fd_init(&fd, work.app.kq, work.fds[0]));
+	ck_err(NEM_fd_init(&fd, work.kq.kq, work.fds[0]));
 	work.fds_freed[0] = true;
 	work.buf = alloca(6);
 
@@ -279,7 +279,7 @@ START_TEST(err_read_closed)
 	ck_assert(!NEM_err_ok(err));
 
 	NEM_fd_free(&fd);
-	NEM_app_free(&work.app);
+	NEM_kq_free(&work.kq);
 	work_free(&work);
 }
 END_TEST
@@ -297,10 +297,10 @@ START_TEST(err_read_then_close)
 {
 	work_t work;
 	work_init(&work);
-	NEM_app_init_root(&work.app);
+	NEM_kq_init_root(&work.kq);
 
 	NEM_fd_t fd;
-	ck_err(NEM_fd_init(&fd, work.app.kq, work.fds[0]));
+	ck_err(NEM_fd_init(&fd, work.kq.kq, work.fds[0]));
 	work.fds_freed[0] = true;
 	work.buf = alloca(6);
 
@@ -311,7 +311,7 @@ START_TEST(err_read_then_close)
 	)));
 
 	NEM_fd_free(&fd);
-	NEM_app_free(&work.app);
+	NEM_kq_free(&work.kq);
 	work_free(&work);
 }
 END_TEST

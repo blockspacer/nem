@@ -50,7 +50,7 @@ NEM_child_init(
 		if (STDIN_FILENO != dup2(devnull, STDIN_FILENO)) {
 			NEM_panicf_errno("NEM_child_init: dup2");
 		}
-		if (NEM_APP_FILENO != dup2(fd_out.fd_in, NEM_APP_FILENO)) {
+		if (NEM_KQ_PARENT_FILENO != dup2(fd_out.fd_in, NEM_KQ_PARENT_FILENO)) {
 			NEM_panicf_errno("NEM_child_init: dup2");
 		}
 		// NB: Inherit stdout/stderr for now.

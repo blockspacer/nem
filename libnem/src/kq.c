@@ -47,7 +47,7 @@ SPLAY_PROTOTYPE(NEM_timer1_tree_t, NEM_timer1_t, link, NEM_timer1_cmp);
 SPLAY_GENERATE(NEM_timer1_tree_t, NEM_timer1_t, link, NEM_timer1_cmp);
 
 static NEM_err_t
-NEM_app_timer1_schedule(NEM_app_t *this, struct timeval now, NEM_timer1_t *next)
+NEM_kq_timer1_schedule(NEM_kq_t *this, struct timeval now, NEM_timer1_t *next)
 {
 	struct kevent ev;
 
@@ -87,7 +87,7 @@ NEM_app_timer1_schedule(NEM_app_t *this, struct timeval now, NEM_timer1_t *next)
 }
 
 static inline void
-NEM_app_timer1_now(struct timeval *t)
+NEM_kq_timer1_now(struct timeval *t)
 {
 	if (gettimeofday(t, NULL)) {
 		NEM_panicf("gettimeofday: %s", strerror(errno));
@@ -95,7 +95,7 @@ NEM_app_timer1_now(struct timeval *t)
 }
 
 static inline void
-NEM_app_timer1_add_ms(struct timeval *t, int ms)
+NEM_kq_timer1_add_ms(struct timeval *t, int ms)
 {
 	t->tv_sec += ms / 1000;
 	t->tv_usec += (ms % 1000) * 1000;
@@ -106,11 +106,11 @@ NEM_app_timer1_add_ms(struct timeval *t, int ms)
 }
 
 static void
-NEM_app_on_timer(NEM_thunk_t *thunk, void *varg)
+NEM_kq_on_timer(NEM_thunk_t *thunk, void *varg)
 {
-	NEM_app_t *this = NEM_thunk_ptr(thunk);
+	NEM_kq_t *this = NEM_thunk_ptr(thunk);
 	struct timeval now;
-	NEM_app_timer1_now(&now);
+	NEM_kq_timer1_now(&now);
 
 	for (;;) {
 		NEM_timer1_t *timer = SPLAY_MIN(NEM_timer1_tree_t, &this->timers);
@@ -123,25 +123,25 @@ NEM_app_on_timer(NEM_thunk_t *thunk, void *varg)
 		free(timer);
 	}
 
-	NEM_err_t err = NEM_app_timer1_schedule(
+	NEM_err_t err = NEM_kq_timer1_schedule(
 		this,
 		now,
 		SPLAY_MIN(NEM_timer1_tree_t, &this->timers)
 	);
 	if (!NEM_err_ok(err)) {
-		NEM_panicf("NEM_app_on_timer: %s", NEM_err_string(err));
+		NEM_panicf("NEM_kq_on_timer: %s", NEM_err_string(err));
 	}
 }
 
 static void
-NEM_app_on_stop(NEM_thunk1_t *thunk, void *varg)
+NEM_kq_on_stop(NEM_thunk1_t *thunk, void *varg)
 {
-	NEM_app_t *this = NEM_thunk1_ptr(thunk);
+	NEM_kq_t *this = NEM_thunk1_ptr(thunk);
 	this->running = false;
 }
 
 static NEM_err_t
-NEM_app_init_internal(NEM_app_t *this)
+NEM_kq_init_internal(NEM_kq_t *this)
 {
 	bzero(this, sizeof(*this));
 	this->kq = kqueue();
@@ -149,13 +149,13 @@ NEM_app_init_internal(NEM_app_t *this)
 		return NEM_err_errno();
 	}
 
-	this->on_timer = NEM_thunk_new_ptr(&NEM_app_on_timer, this);
+	this->on_timer = NEM_thunk_new_ptr(&NEM_kq_on_timer, this);
 	SPLAY_INIT(&this->timers);
 	return NEM_err_none;
 }
 
 static void
-NEM_app_free_fd(NEM_thunk1_t *thunk, void *varg)
+NEM_kq_free_fd(NEM_thunk1_t *thunk, void *varg)
 {
 	NEM_fd_t *fd = NEM_thunk1_ptr(thunk);
 	NEM_fd_free(fd);
@@ -163,30 +163,30 @@ NEM_app_free_fd(NEM_thunk1_t *thunk, void *varg)
 }
 
 NEM_err_t
-NEM_app_init(NEM_app_t *this)
+NEM_kq_init(NEM_kq_t *this)
 {
 	// Pre-emptively check to see if the fd is valid.
-	if (-1 == fcntl(NEM_APP_FILENO, F_GETFD)) {
+	if (-1 == fcntl(NEM_KQ_PARENT_FILENO, F_GETFD)) {
 		if (EBADF == errno) {
-			return NEM_err_static("NEM_app_init: didn't get passed a parent fd?");
+			return NEM_err_static("NEM_kq_init: didn't get passed a parent fd?");
 		}
 		return NEM_err_errno();
 	}
 
-	NEM_err_t err = NEM_app_init_internal(this);
+	NEM_err_t err = NEM_kq_init_internal(this);
 	if (!NEM_err_ok(err)) {
 		return err;
 	}
 
 	NEM_fd_t *fd = NEM_malloc(sizeof(NEM_fd_t));
-	err = NEM_fd_init(fd, this->kq, NEM_APP_FILENO);
+	err = NEM_fd_init(fd, this->kq, NEM_KQ_PARENT_FILENO);
 	if (!NEM_err_ok(err)) {
 		free(fd);
 		return err;
 	}
 
 	NEM_fd_on_close(fd, NEM_thunk1_new_ptr(
-		&NEM_app_free_fd,
+		&NEM_kq_free_fd,
 		fd
 	));
 
@@ -196,16 +196,16 @@ NEM_app_init(NEM_app_t *this)
 }
 
 NEM_err_t
-NEM_app_init_root(NEM_app_t *this)
+NEM_kq_init_root(NEM_kq_t *this)
 {
-	return NEM_app_init_internal(this);
+	return NEM_kq_init_internal(this);
 }
 
 void
-NEM_app_free(NEM_app_t *this)
+NEM_kq_free(NEM_kq_t *this)
 {
 	if (this->running) {
-		NEM_panic("NEM_app_free: app still running!");
+		NEM_panic("NEM_kq_free: kq still running!");
 	}
 
 	if (NULL != this->chan) {
@@ -222,14 +222,14 @@ NEM_app_free(NEM_app_t *this)
 
 	NEM_thunk_free(this->on_timer);
 	if (0 != close(this->kq)) {
-		NEM_panicf_errno("NEM_app_free: close(kq): %s");
+		NEM_panicf_errno("NEM_kq_free: close(kq): %s");
 	}
 
 	this->kq = 0;
 }
 
 static void
-NEM_app_insert_timer(NEM_app_t *this, NEM_timer1_t *timer, struct timeval now)
+NEM_kq_insert_timer(NEM_kq_t *this, NEM_timer1_t *timer, struct timeval now)
 {
 	SPLAY_INSERT(NEM_timer1_tree_t, &this->timers, timer);
 
@@ -237,46 +237,46 @@ NEM_app_insert_timer(NEM_app_t *this, NEM_timer1_t *timer, struct timeval now)
 	// interruption, update the thingy to fire sooner.
 	NEM_timer1_t *next_timer = SPLAY_MIN(NEM_timer1_tree_t, &this->timers);
 	if (timer == next_timer) {
-		NEM_err_t err = NEM_app_timer1_schedule(this, now, next_timer);
+		NEM_err_t err = NEM_kq_timer1_schedule(this, now, next_timer);
 		if (!NEM_err_ok(err)) {
-			NEM_panicf("NEM_app_insert_timer: %s", NEM_err_string(err));
+			NEM_panicf("NEM_kq_insert_timer: %s", NEM_err_string(err));
 		}
 	}
 }
 
 static NEM_timer1_t*
-NEM_app_after_internal(NEM_app_t *this, uint64_t ms, NEM_thunk1_t *cb)
+NEM_kq_after_internal(NEM_kq_t *this, uint64_t ms, NEM_thunk1_t *cb)
 {
 	struct timeval now;
-	NEM_app_timer1_now(&now);
+	NEM_kq_timer1_now(&now);
 
 	NEM_timer1_t *timer = NEM_malloc(sizeof(NEM_timer1_t));
 	timer->thunk = cb;
 	timer->invoke_at = now;
-	NEM_app_timer1_add_ms(&timer->invoke_at, ms);
+	NEM_kq_timer1_add_ms(&timer->invoke_at, ms);
 
-	NEM_app_insert_timer(this, timer, now);
+	NEM_kq_insert_timer(this, timer, now);
 
 	return timer;
 }
 
 void
-NEM_app_after(NEM_app_t *this, uint64_t ms, NEM_thunk1_t *cb)
+NEM_kq_after(NEM_kq_t *this, uint64_t ms, NEM_thunk1_t *cb)
 {
-	NEM_app_after_internal(this, ms, cb);
+	NEM_kq_after_internal(this, ms, cb);
 }
 
 void
-NEM_app_defer(NEM_app_t *this, NEM_thunk1_t *cb)
+NEM_kq_defer(NEM_kq_t *this, NEM_thunk1_t *cb)
 {
-	NEM_app_after(this, 0, cb);
+	NEM_kq_after(this, 0, cb);
 }
 
 void
-NEM_timer_init(NEM_timer_t *this, NEM_app_t *app, NEM_thunk_t *thunk)
+NEM_timer_init(NEM_timer_t *this, NEM_kq_t *kq, NEM_thunk_t *thunk)
 {
 	bzero(this, sizeof(*this));
-	this->app = app;
+	this->kq = kq;
 	this->thunk = thunk;
 }
 
@@ -294,19 +294,19 @@ NEM_timer_set(NEM_timer_t *this, uint64_t ms_after)
 {
 	if (NULL != this->active) {
 		// Sneakily adjust the underlying timer entry.
-		SPLAY_REMOVE(NEM_timer1_tree_t, &this->app->timers, this->active);
+		SPLAY_REMOVE(NEM_timer1_tree_t, &this->kq->timers, this->active);
 
 		struct timeval now;
-		NEM_app_timer1_now(&now);
+		NEM_kq_timer1_now(&now);
 		this->active->invoke_at = now;
-		NEM_app_timer1_add_ms(&this->active->invoke_at, ms_after);
+		NEM_kq_timer1_add_ms(&this->active->invoke_at, ms_after);
 
-		NEM_app_insert_timer(this->app, this->active, now);
+		NEM_kq_insert_timer(this->kq, this->active, now);
 	}
 	else {
 		// Otherwise, need to create a new timer entry.
-		this->active = NEM_app_after_internal(
-			this->app,
+		this->active = NEM_kq_after_internal(
+			this->kq,
 			ms_after,
 			NEM_thunk1_new_ptr(
 				&NEM_timer_on_timer,
@@ -327,9 +327,9 @@ NEM_timer_set_abs(NEM_timer_t *this, struct timeval tv)
 		NEM_timer_set(this, 10);
 	}
 
-	SPLAY_REMOVE(NEM_timer1_tree_t, &this->app->timers, this->active);
+	SPLAY_REMOVE(NEM_timer1_tree_t, &this->kq->timers, this->active);
 	this->active->invoke_at = tv;
-	NEM_app_insert_timer(this->app, this->active, now);
+	NEM_kq_insert_timer(this->kq, this->active, now);
 }
 
 void
@@ -339,7 +339,7 @@ NEM_timer_cancel(NEM_timer_t *this)
 		return;
 	}
 
-	SPLAY_REMOVE(NEM_timer1_tree_t, &this->app->timers, this->active);
+	SPLAY_REMOVE(NEM_timer1_tree_t, &this->kq->timers, this->active);
 	NEM_thunk1_discard(&this->active->thunk);
 	free(this->active);
 	this->active = NULL;
@@ -380,10 +380,10 @@ evfilt_str(int ev)
 }
 
 NEM_err_t
-NEM_app_run(NEM_app_t *this)
+NEM_kq_run(NEM_kq_t *this)
 {
 	if (0 == this->kq) {
-		NEM_panic("NEM_app_run: app not initialized");
+		NEM_panic("NEM_kq_run: kq not initialized");
 	}
 
 	this->running = true;
@@ -391,19 +391,19 @@ NEM_app_run(NEM_app_t *this)
 	while (this->running) {
 		struct kevent trig;
 		if (-1 == kevent(this->kq, NULL, 0, &trig, 1, NULL)) {
-			NEM_panic("NEM_app_run: kevent");
+			NEM_panic("NEM_kq_run: kevent");
 		}
 
 		if (EV_ERROR == (trig.flags & EV_ERROR)) {
 			// XXX: The thunks should process these errors and we shouldn't
 			// be logging them.
-			fprintf(stderr, "NEM_app_run: EV_ERROR: %s", strerror(trig.data));
+			fprintf(stderr, "NEM_kq_run: EV_ERROR: %s", strerror(trig.data));
 			break;
 		}
 
 		NEM_thunk_t *thunk = trig.udata;
 		if (NULL == trig.udata) {
-			NEM_panicf("NEM_app_run: NULL udata filter=%d", trig.filter);
+			NEM_panicf("NEM_kq_run: NULL udata filter=%d", trig.filter);
 		}
 		NEM_thunk_invoke(thunk, &trig);
 	}
@@ -412,9 +412,9 @@ NEM_app_run(NEM_app_t *this)
 }
 
 void
-NEM_app_stop(NEM_app_t *this)
+NEM_kq_stop(NEM_kq_t *this)
 {
 	// NB: Setting a timer procs the kqueue to deliver a message, breaking
 	// it out of the wait loop.
-	NEM_app_after(this, 0, NEM_thunk1_new_ptr(&NEM_app_on_stop, this));
+	NEM_kq_after(this, 0, NEM_thunk1_new_ptr(&NEM_kq_on_stop, this));
 }

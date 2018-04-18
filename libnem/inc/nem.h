@@ -35,7 +35,7 @@
 #include "nem-msghdr.h"
 #include "nem-msg.h"
 #include "nem-chan.h"
-#include "nem-app.h"
+#include "nem-kq.h"
 #include "nem-child.h"
 #include "nem-svcmux.h"
 #include "nem-txnmgr.h"

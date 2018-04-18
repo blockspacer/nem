@@ -3,7 +3,7 @@
 static const char *unix_path = "nem.sock";
 
 typedef struct {
-	NEM_app_t app;
+	NEM_kq_t kq;
 	NEM_list_t list;
 	int nconns;
 	int ctr;
@@ -14,7 +14,7 @@ static void
 work_init(work_t *work)
 {
 	bzero(work, sizeof(*work));
-	ck_err(NEM_app_init_root(&work->app));
+	ck_err(NEM_kq_init_root(&work->kq));
 
 	struct stat sb;
 	if (0 == stat(unix_path, &sb)) {
@@ -28,7 +28,7 @@ static void
 work_free(work_t *work)
 {
 	NEM_list_close(work->list);
-	NEM_app_free(&work->app);
+	NEM_kq_free(&work->kq);
 
 	struct stat sb;
 	ck_assert_int_eq(-1, stat(unix_path, &sb));
@@ -46,7 +46,7 @@ listen_dial_conn(NEM_thunk_t *thunk, void *varg)
 	work->ctr += 1;
 
 	if (work->ctr == 2) {
-		NEM_app_stop(&work->app);
+		NEM_kq_stop(&work->kq);
 	}
 }
 
@@ -60,7 +60,7 @@ listen_dial_cb(NEM_thunk1_t *thunk, void *varg)
 	work->ctr += 1;
 
 	if (work->ctr == 2) {
-		NEM_app_stop(&work->app);
+		NEM_kq_stop(&work->kq);
 	}
 }
 
@@ -71,7 +71,7 @@ START_TEST(listen_dial_unix)
 
 	ck_err(NEM_list_init_unix(
 		&work.list,
-		work.app.kq,
+		work.kq.kq,
 		unix_path,
 		NEM_thunk_new_ptr(
 			&listen_dial_conn,
@@ -80,7 +80,7 @@ START_TEST(listen_dial_unix)
 	));
 
 	NEM_dial_unix(
-		work.app.kq,
+		work.kq.kq,
 		unix_path,
 		NEM_thunk1_new_ptr(
 			&listen_dial_cb,
@@ -88,7 +88,7 @@ START_TEST(listen_dial_unix)
 		)
 	);
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(1, work.nconns);
 	ck_assert_int_eq(2, work.ctr);
 
@@ -103,7 +103,7 @@ START_TEST(listen_dial_tcp)
 
 	ck_err(NEM_list_init_tcp(
 		&work.list,
-		work.app.kq,
+		work.kq.kq,
 		12894,
 		NULL,
 		NEM_thunk_new_ptr(
@@ -113,7 +113,7 @@ START_TEST(listen_dial_tcp)
 	));
 
 	NEM_dial_tcp(
-		work.app.kq,
+		work.kq.kq,
 		12894,
 		"127.0.0.1",
 		NEM_thunk1_new_ptr(
@@ -122,7 +122,7 @@ START_TEST(listen_dial_tcp)
 		)
 	);
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(1, work.nconns);
 	ck_assert_int_eq(2, work.ctr);
 

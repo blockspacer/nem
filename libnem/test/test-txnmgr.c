@@ -1,7 +1,7 @@
 #include "test.h"
 
 typedef struct {
-	NEM_app_t app;
+	NEM_kq_t kq;
 	NEM_fd_t fd_1, fd_2;
 	NEM_txnmgr_t t_1, t_2;
 	NEM_svcmux_t svc_1, svc_2;
@@ -16,14 +16,14 @@ static void
 work_stop_clean(NEM_thunk1_t *thunk, void *varg)
 {
 	work_t *work = NEM_thunk1_ptr(thunk);
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 static void
 work_stop_cb(NEM_thunk1_t *thunk, void *varg)
 {
 	work_t *work = NEM_thunk1_ptr(thunk);
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 	ck_assert_msg(false, "too long");
 }
 
@@ -81,7 +81,7 @@ work_svc_1_3(NEM_thunk_t *thunk, void *varg)
 		memcpy(msg->body, "done", 5);
 		NEM_txnin_reply(ca->txnin, msg);
 
-		NEM_app_after(&work->app, 500, NEM_thunk1_new_ptr(
+		NEM_kq_after(&work->kq, 500, NEM_thunk1_new_ptr(
 			&work_stop_clean,
 			work
 		));
@@ -113,7 +113,7 @@ work_svc_1_4(NEM_thunk_t *thunk, void *varg)
 	work->txnin = ca->txnin;
 	ck_err(ca->err);
 
-	NEM_app_after(&work->app, 80, NEM_thunk1_new_ptr(
+	NEM_kq_after(&work->kq, 80, NEM_thunk1_new_ptr(
 		&work_svc_1_4_cb,
 		work
 	));
@@ -123,14 +123,14 @@ static void
 work_init(work_t *work)
 {
 	bzero(work, sizeof(*work));
-	ck_err(NEM_app_init_root(&work->app));
+	ck_err(NEM_kq_init_root(&work->kq));
 
-	ck_err(NEM_fd_init_unix(&work->fd_1, &work->fd_2, work->app.kq));
+	ck_err(NEM_fd_init_unix(&work->fd_1, &work->fd_2, work->kq.kq));
 
-	NEM_txnmgr_init(&work->t_1, NEM_fd_as_stream(&work->fd_1), &work->app);
-	NEM_txnmgr_init(&work->t_2, NEM_fd_as_stream(&work->fd_2), &work->app);
+	NEM_txnmgr_init(&work->t_1, NEM_fd_as_stream(&work->fd_1), &work->kq);
+	NEM_txnmgr_init(&work->t_2, NEM_fd_as_stream(&work->fd_2), &work->kq);
 
-	NEM_app_after(&work->app, 3000, NEM_thunk1_new_ptr(
+	NEM_kq_after(&work->kq, 3000, NEM_thunk1_new_ptr(
 		&work_stop_cb,
 		work
 	));
@@ -163,7 +163,7 @@ work_free(work_t *work)
 	NEM_txnmgr_free(&work->t_2);
 	NEM_fd_free(&work->fd_1);
 	NEM_fd_free(&work->fd_2);
-	NEM_app_free(&work->app);
+	NEM_kq_free(&work->kq);
 }
 
 START_TEST(scaffolding)
@@ -203,7 +203,7 @@ send_recv_1_1_cb(NEM_thunk_t *thunk, void *varg)
 	// NB: The message is automatically freed here.
 
 	work->ctr2 += 1;
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 START_TEST(send_recv_1_1)
@@ -220,7 +220,7 @@ START_TEST(send_recv_1_1)
 		&work
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 10);
 	ck_assert_int_eq(work.ctr2, 1);
 	work_free(&work);
@@ -248,7 +248,7 @@ send_recv_1_2_cb(NEM_thunk_t *thunk, void *varg)
 		ck_assert_int_eq(0, ca->msg->packed.header_len);
 		ck_assert_str_eq("world", ca->msg->body);
 		ck_assert(ca->done);
-		NEM_app_stop(&work->app);
+		NEM_kq_stop(&work->kq);
 	}
 
 	work->ctr2 += 1;
@@ -268,7 +268,7 @@ START_TEST(send_recv_1_2)
 		&work
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 100);
 	ck_assert_int_eq(work.ctr2, 2);
 	work_free(&work);
@@ -312,7 +312,7 @@ START_TEST(send_recv_1_3)
 	msg->packed.command_id = 3;
 	NEM_txnout_req_continue(work.txnout, msg);
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 2000);
 	ck_assert_int_eq(work.ctr2, 2);
 	work_free(&work);
@@ -330,7 +330,7 @@ send_recv_1_4_cb(NEM_thunk_t *thunk, void *varg)
 	ck_assert_ptr_ne(NULL, ca->msg);
 	ck_assert_int_eq(7, ca->msg->packed.body_len);
 	ck_assert_str_eq("thanks", ca->msg->body);
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 START_TEST(send_recv_1_4)
@@ -347,7 +347,7 @@ START_TEST(send_recv_1_4)
 		&work
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 11);
 	ck_assert_int_eq(work.ctr2, 1);
 	work_free(&work);
@@ -367,7 +367,7 @@ err_fd_closed_clisend_cb(NEM_thunk_t *thunk, void *varg)
 	ck_assert_ptr_eq(NULL, ca->msg);
 	ck_assert(ca->done);
 	work->ctr2 += 1;
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 START_TEST(err_fd_closed_clisend)
@@ -386,7 +386,7 @@ START_TEST(err_fd_closed_clisend)
 		&work
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 0);
 	ck_assert_int_eq(work.ctr2, 1);
 	work_free(&work);
@@ -422,7 +422,7 @@ err_fd_closed_srvsend_cb(NEM_thunk_t *thunk, void *varg)
 
 	work->ctr2 += 1;
 
-	NEM_app_defer(&work->app, NEM_thunk1_new_ptr(&work_stop_clean, work));
+	NEM_kq_defer(&work->kq, NEM_thunk1_new_ptr(&work_stop_clean, work));
 }
 
 START_TEST(err_fd_closed_srvsend)
@@ -439,7 +439,7 @@ START_TEST(err_fd_closed_srvsend)
 		&work
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 100);
 	ck_assert_int_eq(work.ctr2, 2);
 	work_free(&work);
@@ -459,7 +459,7 @@ err_send_invalid_cmd_cb(NEM_thunk_t *thunk, void *varg)
 	ck_assert_ptr_eq(NULL, ca->txnin);
 	ck_assert_ptr_ne(NULL, ca->mgr);
 	ck_assert(ca->done);
-	NEM_app_stop(&work->app);
+	NEM_kq_stop(&work->kq);
 }
 
 START_TEST(err_send_invalid_cmd)
@@ -476,7 +476,7 @@ START_TEST(err_send_invalid_cmd)
 		&work
 	));
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr2, 1);
 	work_free(&work);
 }
@@ -499,13 +499,13 @@ err_timeout_cb(NEM_thunk_t *thunk, void *varg)
 	if (work->flags) {
 		// We got ca->done, so the transaction should be purged. Delay 
 		// stopping to ensure this doesn't get called again.
-		NEM_app_after(&work->app, 100, NEM_thunk1_new_ptr(
+		NEM_kq_after(&work->kq, 100, NEM_thunk1_new_ptr(
 			&work_stop_clean,
 			work
 		));
 	}
 	else {
-		NEM_app_stop(&work->app);
+		NEM_kq_stop(&work->kq);
 	}
 }
 
@@ -529,7 +529,7 @@ err_timeout_scaffold(bool delay)
 
 	int off = delay ? 10 : 0; // Whether we waited for the svc to reply.
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 1 + off);
 	ck_assert_int_eq(work.ctr2, 1);
 	work_free(&work);
@@ -558,7 +558,7 @@ cancel_cli_cb(NEM_thunk_t *thunk, void *varg)
 	ck_assert(!NEM_err_ok(ca->err));
 	ck_assert_ptr_eq(NULL, ca->msg);
 
-	NEM_app_after(&work->app, 160, NEM_thunk1_new_ptr(
+	NEM_kq_after(&work->kq, 160, NEM_thunk1_new_ptr(
 		&work_stop_clean,
 		work
 	));
@@ -581,7 +581,7 @@ START_TEST(cancel_cli)
 	NEM_txnout_req(txn, msg);
 	NEM_txnout_cancel(txn);
 
-	ck_err(NEM_app_run(&work.app));
+	ck_err(NEM_kq_run(&work.kq));
 	ck_assert_int_eq(work.ctr, 11);
 	ck_assert_int_eq(work.ctr2, 1);
 	work_free(&work);
