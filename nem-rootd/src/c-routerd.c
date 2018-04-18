@@ -1,5 +1,5 @@
 #include "nem.h"
-#include "nem-svc-router.h"
+#include "nemsvc.h"
 #include "state.h"
 #include "lifecycle.h"
 #include "txnmgr.h"

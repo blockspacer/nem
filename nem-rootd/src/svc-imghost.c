@@ -1,4 +1,5 @@
 #include "nem.h"
+#include "nemsvc.h"
 #include "lifecycle.h"
 #include "state.h"
 #include "svcdef.h"

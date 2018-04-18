@@ -1,4 +1,5 @@
 #include "nem.h"
+#include "nemsvc.h"
 #include "txnmgr.h"
 #include "state.h"
 

@@ -14,6 +14,9 @@ static const cmd_data_t daemon_cmds[] = {
 	{ NEM_cmdid_daemon_stop,   "stop"   },
 };
 
+static const cmd_data_t host_cmds[] = {
+};
+
 static const cmd_data_t router_cmds[] = {
 	{ NEM_cmdid_router_bind,          "bind"          },
 	{ NEM_cmdid_router_register_svc,  "register-svc"  },
@@ -39,6 +42,7 @@ static const struct {
 }
 svc_id_map[] = {
 	CMD_DEF(daemon, false),
+	CMD_DEF(host, false),
 	CMD_DEF(router, false),
 	CMD_DEF(imghost, false),
 };

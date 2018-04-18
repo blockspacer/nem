@@ -33,6 +33,7 @@ BUILD_FLAGS="
 	-isystem/home/lye/code/libtoml2/inc
 	-Iinc
 	-I../libnem/inc
+	-I../libnemsvc/inc
 "
 
 mkdir -p bin
@@ -55,7 +56,8 @@ $CC \
 	obj/main.o \
 	-o ./bin/nem-rootd \
 	$LIBS \
-	../libnem/bin/libnem.a
+	../libnem/bin/libnem.a \
+	../libnemsvc/bin/libnemsvc.a
 
 $CC \
 	$BUILD_FLAGS \
@@ -63,6 +65,7 @@ $CC \
 	test/*.c \
 	-o ./bin/rootd.test \
 	$LIBS -lcheck \
-	../libnem/bin/libnem.a
+	../libnem/bin/libnem.a \
+	../libnemsvc/bin/libnemsvc.a
 
 ./bin/rootd.test
