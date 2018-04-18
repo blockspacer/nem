@@ -40,3 +40,4 @@
 #include "nem-svcmux.h"
 #include "nem-txnmgr.h"
 #include "nem-rootcert.h"
+#include "nem-app.h"
