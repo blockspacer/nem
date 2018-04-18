@@ -56,12 +56,11 @@ void *NEM_txn_data(NEM_txn_t *this);
 // be retrieved with NEM_txn_data.
 void NEM_txn_set_data(NEM_txn_t *this, void *data);
 
-// NEM_txn_cancel aborts the entire transaction, removing it and every
+// NEM_txnout_cancel aborts the entire transaction, removing it and every
 // child transaction from their respective managers. This invalidates the
-// transaction object. For outgoing transactions, this invokes the callback
-// before freeing the transaction.
-void NEM_txn_cancel(NEM_txn_t *this);
-void NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err);
+// transaction object. This invokes the callback before freeing the transaction.
+void NEM_txnout_cancel(NEM_txnout_t *this);
+void NEM_txnout_cancel_err(NEM_txnout_t *this, NEM_err_t err);
 
 // NEM_txnout_set_timeout sets the timeout in milliseconds for this transaction.
 // Once the period is expired, the transaction (and all children) are
@@ -69,8 +68,18 @@ void NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err);
 // when child transactions are associated they make a copy of the parent's
 // absolute timeout value.
 // 
-// Setting -1 milliseconds makes the timeout infinite.
+// Setting -1 milliseconds makes the timeout infinite. There is an automatic
+// default timeout set.
 void NEM_txnout_set_timeout(NEM_txnout_t *this, int milliseconds);
+
+// NEM_txnout_req finializes the outgoing transaction and sends the 
+// provided message.
+void NEM_txnout_req(NEM_txnout_t *this, NEM_msg_t *msg);
+
+// NEM_txnout_req_continue sends another message as part of the given
+// transaction. It does not finalize the transaction (NEM_txnout_req must
+// eventually be called).
+void NEM_txnout_req_continue(NEM_txnout_t *this, NEM_msg_t *msg);
 
 // NEM_txnin_reply finalizes the transaction and sends the provided message.
 // This invalidates the transaction object.
@@ -82,15 +91,6 @@ void NEM_txnin_reply_err(NEM_txnin_t *this, NEM_err_t err);
 // NEM_txnin_reply_continue sends a message without invalidating the
 // transaction object.
 void NEM_txnin_reply_continue(NEM_txnin_t *this, NEM_msg_t *msg);
-
-// NEM_txnout_req finializes the outgoing transaction and sends the 
-// provided message.
-void NEM_txnout_req(NEM_txnout_t *this, NEM_msg_t *msg);
-
-// NEM_txnout_req_continue sends another message as part of the given
-// transaction. It does not finalize the transaction (NEM_txnout_req must
-// eventually be called).
-void NEM_txnout_req_continue(NEM_txnout_t *this, NEM_msg_t *msg);
 
 // NEM_txn*_tree_t is a tree of transactions, ordered by seqid.
 typedef SPLAY_HEAD(NEM_txnin_tree_t, NEM_txnin_t) NEM_txnin_tree_t;
@@ -129,7 +129,7 @@ void NEM_txnmgr_set_mux(NEM_txnmgr_t *this, NEM_svcmux_t *mux);
 // is invoked with ca.done.
 NEM_txnout_t* NEM_txnmgr_req(
 	NEM_txnmgr_t *this,
-	NEM_txn_t    *parent,
+	NEM_txnin_t  *parent,
 	NEM_thunk_t  *thunk
 );
 
@@ -139,7 +139,7 @@ NEM_txnout_t* NEM_txnmgr_req(
 // transaction should still cancel it).
 void NEM_txnmgr_req1(
 	NEM_txnmgr_t *this,
-	NEM_txn_t    *parent,
+	NEM_txnin_t  *parent,
 	NEM_msg_t    *msg,
 	NEM_thunk_t  *thunk
 );
@@ -185,16 +185,4 @@ static inline void
 NEM_txnout_set_data(NEM_txnout_t *this, void *data)
 {
 	return NEM_txn_set_data(&this->base, data);
-}
-
-static inline void
-NEM_txnin_cancel(NEM_txnin_t *this)
-{
-	return NEM_txn_cancel(&this->base);
-}
-
-static inline void
-NEM_txnout_cancel(NEM_txnout_t *this)
-{
-	return NEM_txn_cancel(&this->base);
 }

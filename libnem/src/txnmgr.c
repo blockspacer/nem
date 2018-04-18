@@ -176,22 +176,23 @@ NEM_txn_cancel_internal(NEM_txn_t *this, NEM_msg_t *msg, NEM_err_t err)
 }
 
 void
-NEM_txn_cancel_err(NEM_txn_t *this, NEM_err_t err)
+NEM_txnout_cancel_err(NEM_txnout_t *this, NEM_err_t err)
 {
 	// NB: This is an exported function, so explicitly free.
-	NEM_txn_cancel_internal(this, NULL, err);
+	NEM_txn_cancel_internal(&this->base, NULL, err);
 
-	for (size_t i = 0; i < this->children_len; i += 1) {
-		NEM_txn_cancel_err(this->children[i], err);
+	for (size_t i = 0; i < this->base.children_len; i += 1) {
+		// XXX: How does this work?
+		//NEM_txnout_cancel_err(this->base.children[i], err);
 	}
 
-	NEM_txn_free(this);
+	NEM_txn_free(&this->base);
 }
 
 void
-NEM_txn_cancel(NEM_txn_t *this)
+NEM_txnout_cancel(NEM_txnout_t *this)
 {
-	NEM_txn_cancel_err(this, NEM_err_static("transaction cancelled"));
+	NEM_txnout_cancel_err(this, NEM_err_static("transaction cancelled"));
 }
 
 static void
@@ -721,7 +722,7 @@ NEM_txnmgr_set_mux(NEM_txnmgr_t *this, NEM_svcmux_t *mux)
 }
 
 NEM_txnout_t*
-NEM_txnmgr_req(NEM_txnmgr_t *this, NEM_txn_t *parent, NEM_thunk_t *thunk)
+NEM_txnmgr_req(NEM_txnmgr_t *this, NEM_txnin_t *parent, NEM_thunk_t *thunk)
 {
 	if (NULL == thunk) {
 		NEM_panic("NEM_txnmgr_req: cannot have a NULL thunk");
@@ -735,7 +736,7 @@ NEM_txnmgr_req(NEM_txnmgr_t *this, NEM_txn_t *parent, NEM_thunk_t *thunk)
 	txnout->base.seq = ++this->seq;
 	txnout->base.thunk = thunk;
 	if (NULL != parent) {
-		txnout->base.timeout = parent->timeout;
+		txnout->base.timeout = parent->base.timeout;
 	}
 	NEM_txnmgr_add_txn(this, &txnout->base);
 
@@ -749,7 +750,7 @@ NEM_txnmgr_req(NEM_txnmgr_t *this, NEM_txn_t *parent, NEM_thunk_t *thunk)
 void
 NEM_txnmgr_req1(
 	NEM_txnmgr_t *this,
-	NEM_txn_t    *parent,
+	NEM_txnin_t  *parent,
 	NEM_msg_t    *msg,
 	NEM_thunk_t  *thunk
 ) {

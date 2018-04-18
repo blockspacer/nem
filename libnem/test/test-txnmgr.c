@@ -113,7 +113,7 @@ work_svc_1_4(NEM_thunk_t *thunk, void *varg)
 	work->txnin = ca->txnin;
 	ck_err(ca->err);
 
-	NEM_app_after(&work->app, 100, NEM_thunk1_new_ptr(
+	NEM_app_after(&work->app, 80, NEM_thunk1_new_ptr(
 		&work_svc_1_4_cb,
 		work
 	));
@@ -547,6 +547,47 @@ START_TEST(err_timeout_nodelay)
 }
 END_TEST
 
+static void
+cancel_cli_cb(NEM_thunk_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk_ptr(thunk);
+	NEM_txn_ca *ca = varg;
+	work->ctr2 += 1;
+
+	ck_assert(ca->done);
+	ck_assert(!NEM_err_ok(ca->err));
+	ck_assert_ptr_eq(NULL, ca->msg);
+
+	NEM_app_after(&work->app, 160, NEM_thunk1_new_ptr(
+		&work_stop_clean,
+		work
+	));
+}
+
+START_TEST(cancel_cli)
+{
+	work_t work;
+	work_init(&work);
+
+	NEM_msg_t *msg = NEM_msg_new(0, 0);
+	msg->packed.service_id = 1;
+	msg->packed.command_id = 4;
+
+	NEM_txnout_t *txn = NEM_txnmgr_req(&work.t_2, NULL, NEM_thunk_new_ptr(
+		&cancel_cli_cb,
+		&work
+	));
+	NEM_txnout_set_timeout(txn, 10);
+	NEM_txnout_req(txn, msg);
+	NEM_txnout_cancel(txn);
+
+	ck_err(NEM_app_run(&work.app));
+	ck_assert_int_eq(work.ctr, 11);
+	ck_assert_int_eq(work.ctr2, 1);
+	work_free(&work);
+}
+END_TEST
+
 Suite*
 suite_txnmgr()
 {
@@ -562,6 +603,7 @@ suite_txnmgr()
 		{ "err_send_invalid_cmd",  &err_send_invalid_cmd  },
 		{ "err_timeout",           &err_timeout           },
 		{ "err_timeout_nodelay",   &err_timeout_nodelay   },
+		{ "cancel_cli",            &cancel_cli            },
 	};
 
 	return tcase_build_suite("txnmgr", tests, sizeof(tests));
