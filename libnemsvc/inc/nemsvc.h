@@ -1,15 +1,15 @@
 #pragma once
 #include <sys/types.h>
+#include <stdbool.h>
+#include "nem-error.h"
 #include "nem-marshal.h"
 
 static const uint16_t 
 	NEM_svcid_daemon  = 1,
-	NEM_svcid_host    = 2,
-	NEM_svcid_router  = 3,
-	NEM_svcid_imghost = 4;
+	NEM_svcid_router  = 2,
+	NEM_svcid_imghost = 3;
 
 #include "nemsvc-daemon.h"
-#include "nemsvc-host.h"
 #include "nemsvc-router.h"
 #include "nemsvc-imghost.h"
 

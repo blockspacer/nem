@@ -1,5 +1,5 @@
+#include "nemsvc.h"
 #include "nem.h"
-#include "nem-svc-router.h"
 
 #define O(F) offsetof(TYPE, F)
 #define M(F) NEM_MSIZE(TYPE, F)

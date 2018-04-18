@@ -1,3 +1,4 @@
+#include "nemsvc.h"
 #include "nem.h"
 
 typedef struct {
@@ -11,9 +12,6 @@ static const cmd_data_t daemon_cmds[] = {
 	{ NEM_cmdid_daemon_getcfg, "getcfg" },
 	{ NEM_cmdid_daemon_setcfg, "setcfg" },
 	{ NEM_cmdid_daemon_stop,   "stop"   },
-};
-
-static const cmd_data_t host_cmds[] = {
 };
 
 static const cmd_data_t router_cmds[] = {
@@ -41,7 +39,6 @@ static const struct {
 }
 svc_id_map[] = {
 	CMD_DEF(daemon, false),
-	CMD_DEF(host, false),
 	CMD_DEF(router, false),
 	CMD_DEF(imghost, false),
 };
