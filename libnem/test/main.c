@@ -18,7 +18,8 @@ extern Suite
 	*suite_chan(),
 	*suite_svcmux(),
 	*suite_txnmgr(),
-	*suite_rootcert();
+	*suite_rootcert(),
+	*suite_app();
 
 static suite_def suites[] = {
 	&suite_thunk,
@@ -37,6 +38,7 @@ static suite_def suites[] = {
 	&suite_svcmux,
 	&suite_txnmgr,
 	&suite_rootcert,
+	&suite_app,
 };
 
 int

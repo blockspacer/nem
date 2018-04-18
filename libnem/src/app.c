@@ -4,6 +4,14 @@ void
 NEM_app_init(NEM_app_t *this)
 {
 	bzero(this, sizeof(*this));
+	NEM_kq_init(&this->kq);
+}
+
+void
+NEM_app_init_root(NEM_app_t *this)
+{
+	bzero(this, sizeof(*this));
+	NEM_kq_init_root(&this->kq);
 }
 
 void
@@ -35,8 +43,8 @@ void NEM_app_add_comps(
 	}
 }
 
-static NEM_err_t
-NEM_app_main_internal(NEM_app_t *this, int argc, char *argv[])
+NEM_err_t
+NEM_app_main(NEM_app_t *this, int argc, char *argv[])
 {
 	NEM_err_t err = NEM_err_none;
 	size_t i = 0;
@@ -54,7 +62,7 @@ NEM_app_main_internal(NEM_app_t *this, int argc, char *argv[])
 		// Teardown everything that's been constructed.
 		for (; i > 0; i -= 1) {
 			if (NULL != this->comps[i - 1].comp->teardown) {
-				this->comps[i - 1].comp->teardown();
+				this->comps[i - 1].comp->teardown(this);
 			}
 			this->comps[i - 1].running = false;
 			this->comps_running -= 1;
@@ -66,29 +74,18 @@ NEM_app_main_internal(NEM_app_t *this, int argc, char *argv[])
 	NEM_panic_if_err(NEM_kq_run(&this->kq));
 
 	for (size_t i = this->comps_len; i > 0; i -= 1) {
-		if (NULL != this->comps[i].comp->teardown) {
-			this->comps[i].comp->teardown();
-			this->comps[i].running = false;
+		if (NULL != this->comps[i - 1].comp->teardown) {
+			this->comps[i - 1].comp->teardown(this);
+			this->comps[i - 1].running = false;
 			this->comps_running -= 1;
 		}
 	}
 
+	// NB: This is NEM_app_free effectively.
 	NEM_kq_free(&this->kq);
+	free(this->comps);
+
 	return NEM_err_none;
-}
-
-NEM_err_t
-NEM_app_main_root(NEM_app_t *this, int argc, char *argv[])
-{
-	NEM_panic_if_err(NEM_kq_init_root(&this->kq));
-	return NEM_app_main_internal(this, argc, argv);
-}
-
-NEM_err_t
-NEM_app_main(NEM_app_t *this, int argc, char *argv[])
-{
-	NEM_panic_if_err(NEM_kq_init(&this->kq));
-	return NEM_app_main_internal(this, argc, argv);
 }
 
 static void
@@ -105,7 +102,7 @@ NEM_app_shutdown_step(NEM_thunk1_t *thunk, void *varg)
 			this->comps[i].running = false;
 			this->comps_running -= 1;
 		}
-		else if (this->comps[i].comp->try_shutdown()) {
+		else if (this->comps[i].comp->try_shutdown(this)) {
 			this->comps[i].running = false;
 			this->comps_running -= 1;
 		}
