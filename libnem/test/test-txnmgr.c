@@ -588,6 +588,27 @@ START_TEST(cancel_cli)
 }
 END_TEST
 
+static void
+on_close_cb(NEM_thunk1_t *thunk, void *varg)
+{
+	work_t *work = NEM_thunk1_ptr(thunk);
+	work->ctr += 1;
+}
+
+START_TEST(on_close)
+{
+	work_t work;
+	work_init(&work);
+	NEM_txnmgr_on_close(&work.t_1, NEM_thunk1_new_ptr(
+		&on_close_cb,
+		&work
+	));
+	work_free(&work);
+
+	ck_assert_int_eq(1, work.ctr);
+}
+END_TEST
+
 Suite*
 suite_txnmgr()
 {
@@ -604,6 +625,7 @@ suite_txnmgr()
 		{ "err_timeout",           &err_timeout           },
 		{ "err_timeout_nodelay",   &err_timeout_nodelay   },
 		{ "cancel_cli",            &cancel_cli            },
+		{ "on_close",              &on_close              },
 	};
 
 	return tcase_build_suite("txnmgr", tests, sizeof(tests));

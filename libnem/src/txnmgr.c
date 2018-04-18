@@ -372,6 +372,14 @@ NEM_txnmgr_shutdown(NEM_txnmgr_t *this, NEM_err_t err)
 	if (NULL != this->mux) {
 		NEM_svcmux_unref(this->mux);
 	}
+
+	if (NULL != this->on_close) {
+		NEM_txn_ca ca = {
+			.mgr = this,
+			.err = this->err,
+		};
+		NEM_thunk1_invoke(&this->on_close, &ca);
+	}
 }
 
 static void
@@ -572,7 +580,7 @@ NEM_txnmgr_on_msg(NEM_thunk_t *thunk, void *varg)
 }
 
 static void
-NEM_txnmgr_on_close(NEM_thunk1_t *thunk, void *varg)
+NEM_txnmgr_on_chan_close(NEM_thunk1_t *thunk, void *varg)
 {
 	NEM_txnmgr_t *this = NEM_thunk1_ptr(thunk);
 	NEM_chan_ca *ca = varg;
@@ -617,7 +625,7 @@ NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream, NEM_kq_t *kq)
 	this->err = NEM_err_none;
 
 	NEM_chan_on_close(&this->chan, NEM_thunk1_new_ptr(
-		&NEM_txnmgr_on_close, this
+		&NEM_txnmgr_on_chan_close, this
 	));
 }
 
@@ -698,6 +706,24 @@ NEM_txnmgr_free(NEM_txnmgr_t *this)
 	while (NULL != (txnout = SPLAY_MIN(NEM_txnout_tree_t, &this->txns_out))) {
 		NEM_txn_free(&txnout->base);
 	}
+}
+
+void
+NEM_txnmgr_on_close(NEM_txnmgr_t *this, NEM_thunk1_t *thunk)
+{
+	if (NULL != this->on_close) {
+		NEM_panic("NEM_txnmgr_on_close: callback already assigned");
+	}
+	if (!NEM_err_ok(this->err)) {
+		NEM_txn_ca ca = {
+			.mgr = this,
+			.err = this->err,
+		};
+		NEM_thunk1_invoke(&thunk, &ca);
+		return;
+	}
+
+	this->on_close = thunk;
 }
 
 void

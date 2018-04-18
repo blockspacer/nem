@@ -94,7 +94,7 @@ START_TEST(setup_teardown_order)
 {
 	work_t work; 
 	work_init(&work);
-	NEM_app_comp_t *comps[] = {
+	const NEM_app_comp_t *comps[] = {
 		&setup_teardown_order_comp1,
 		&setup_teardown_order_comp2,
 		&shutdown_comp,

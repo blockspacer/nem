@@ -106,6 +106,7 @@ struct NEM_txnmgr_t {
 	NEM_txnin_tree_t  txns_in;
 	NEM_txnout_tree_t txns_out;
 	NEM_txn_tree_t    timeouts;
+	NEM_thunk1_t     *on_close;
 	NEM_svcmux_t     *mux;
 	uint64_t          seq;
 	NEM_err_t         err;
@@ -115,7 +116,15 @@ struct NEM_txnmgr_t {
 // stream becomes owned by this txnmgr and will be freed when the txnmgr
 // is closed.
 void NEM_txnmgr_init(NEM_txnmgr_t *this, NEM_stream_t stream, NEM_kq_t *kq);
+
+// NEM_txnmgr_free shuts down the backing stream and sends an error to all
+// in-flight request handlers (e.g. any txnin's/txnout's).
 void NEM_txnmgr_free(NEM_txnmgr_t *this);
+
+// NEM_txnmgr_on_close attaches a callback which is invoked when the 
+// transaction manager is closed (either explicitly or by the underlying
+// stream closing).
+void NEM_txnmgr_on_close(NEM_txnmgr_t *this, NEM_thunk1_t *thunk);
 
 // NEM_txnmgr_set_mux replaces the existing mux with the specified one.
 // This adds a ref to the passed in mux to keep it alive.

@@ -15,15 +15,15 @@ NEM_app_init_root(NEM_app_t *this)
 }
 
 void
-NEM_app_add_comp(NEM_app_t *this, NEM_app_comp_t *comp)
+NEM_app_add_comp(NEM_app_t *this, const NEM_app_comp_t *comp)
 {
 	NEM_app_add_comps(this, &comp, 1);
 }
 
 void NEM_app_add_comps(
-	NEM_app_t       *this,
-	NEM_app_comp_t **comps,
-	size_t           num_comps
+	NEM_app_t            *this,
+	NEM_app_comp_t const**comps,
+	size_t                num_comps
 ) {
 	if (this->kq.running) {
 		NEM_panicf("NEM_app_add_comps: already running");

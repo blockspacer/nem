@@ -16,10 +16,17 @@ NEM_child_on_kevent(NEM_thunk_t *thunk, void *varg)
 	}
 }
 
+static void
+NEM_child_on_txnmgr_close(NEM_thunk1_t *thunk, void *varg)
+{
+	NEM_child_t *this = NEM_thunk1_ptr(thunk);
+	NEM_child_stop(this);
+}
+
 NEM_err_t
 NEM_child_init(
 	NEM_child_t  *this,
-	int           kq,
+	NEM_kq_t     *kq,
 	const char   *path,
 	NEM_thunk1_t *preexec
 ) {
@@ -33,7 +40,7 @@ NEM_child_init(
 	this->state = CHILD_RUNNING;
 	NEM_fd_t fd_out;
 
-	NEM_err_t err = NEM_fd_init_unix(&this->fd, &fd_out, kq);
+	NEM_err_t err = NEM_fd_init_unix(&this->fd, &fd_out, kq->kq);
 	if (!NEM_err_ok(err)) {
 		close(this->exe_fd);
 		this->exe_fd = 0;
@@ -79,12 +86,16 @@ NEM_child_init(
 
 	struct kevent kev;
 	EV_SET(&kev, this->pid, EVFILT_PROC, EV_ADD, NOTE_EXIT, 0, this->on_kevent);
-	if (-1 == kevent(kq, &kev, 1, NULL, 0, NULL)) {
+	if (-1 == kevent(kq->kq, &kev, 1, NULL, 0, NULL)) {
 		NEM_panicf_errno("NEM_child_run: kevent");
 	}
 
-	this->kq = kq;
-	NEM_chan_init(&this->chan, NEM_fd_as_stream(&this->fd));
+	this->kq = kq->kq;
+	NEM_txnmgr_init(&this->txnmgr, NEM_fd_as_stream(&this->fd), kq);
+	NEM_txnmgr_on_close(&this->txnmgr, NEM_thunk1_new_ptr(
+		&NEM_child_on_txnmgr_close,
+		this
+	));
 
 	return NEM_err_none;
 }
@@ -124,7 +135,7 @@ NEM_child_free(NEM_child_t *this)
 	NEM_child_stop(this);
 
 	NEM_fd_free(&this->fd);
-	NEM_chan_free(&this->chan);
+	NEM_txnmgr_free(&this->txnmgr);
 
 	if (NULL != this->on_kevent) {
 		NEM_thunk_free(this->on_kevent);

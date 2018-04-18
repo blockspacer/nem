@@ -4,6 +4,7 @@ typedef Suite*(*suite_def)();
 
 extern Suite 
 	*suite_thunk(),
+	*suite_rootcert(),
 	*suite_marshal(),
 	*suite_marshal_json(),
 	*suite_marshal_bson(),
@@ -18,11 +19,11 @@ extern Suite
 	*suite_chan(),
 	*suite_svcmux(),
 	*suite_txnmgr(),
-	*suite_rootcert(),
 	*suite_app();
 
 static suite_def suites[] = {
 	&suite_thunk,
+	&suite_rootcert,
 	&suite_marshal,
 	&suite_marshal_json,
 	&suite_marshal_bson,
@@ -37,7 +38,6 @@ static suite_def suites[] = {
 	&suite_chan,
 	&suite_svcmux,
 	&suite_txnmgr,
-	&suite_rootcert,
 	&suite_app,
 };
 

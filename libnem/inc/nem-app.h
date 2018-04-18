@@ -31,8 +31,8 @@ typedef struct {
 NEM_app_comp_t;
 
 typedef struct {
-	NEM_app_comp_t *comp;
-	bool            running;
+	const NEM_app_comp_t *comp;
+	bool                  running;
 }
 NEM_app_compentry_t;
 
@@ -52,11 +52,11 @@ void NEM_app_init_root(NEM_app_t *app);
 
 // NEM_app_add_comp registers a component with the application. It can
 // only be called before NEM_app_main.
-void NEM_app_add_comp(NEM_app_t *this, NEM_app_comp_t *comp);
+void NEM_app_add_comp(NEM_app_t *this, const NEM_app_comp_t *comp);
 void NEM_app_add_comps(
-	NEM_app_t       *this,
-	NEM_app_comp_t **comps,
-	size_t                 num_comps
+	NEM_app_t            *this,
+	NEM_app_comp_t const**comps,
+	size_t                num_comps
 );
 
 // NEM_app_main runs the application components as configured.

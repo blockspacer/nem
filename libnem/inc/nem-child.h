@@ -17,7 +17,7 @@ typedef struct {
 	pid_t             pid;
 	NEM_child_state_t state;
 	NEM_fd_t          fd;
-	NEM_chan_t        chan;
+	NEM_txnmgr_t      txnmgr;
 	NEM_thunk_t      *on_kevent;
 	NEM_thunk1_t     *on_close;
 }
@@ -28,7 +28,7 @@ NEM_child_t;
 // the NEM_child_t is automatically freed.
 NEM_err_t NEM_child_init(
 	NEM_child_t  *this,
-	int           kq,
+	NEM_kq_t     *kq,
 	const char   *path,
 	NEM_thunk1_t *preexec
 );
