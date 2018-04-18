@@ -20,6 +20,7 @@ NEM_svcmux_entry_t;
 // allocations (use thunk-inline allocations if really needed).
 typedef struct {
 	NEM_svcmux_entry_t *handlers;
+	NEM_thunk_t        *default_handler;
 	size_t              handlers_len;
 	int                 refcount;
 }
@@ -37,6 +38,13 @@ void NEM_svcmux_add_handlers(
 	NEM_svcmux_t       *this,
 	NEM_svcmux_entry_t *entries,
 	size_t              entries_len
+);
+
+// NEM_svcmux_set_default sets the default handler. The default handler is
+// returned by NEM_svcmux_resolve when there are no matching handlers. 
+void NEM_svcmux_set_default(
+	NEM_svcmux_t *this,
+	NEM_thunk_t  *thunk
 );
 
 // NEM_svcmux_ref increments the refcount for NEM_svcmux_t.

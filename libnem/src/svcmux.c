@@ -31,6 +31,11 @@ NEM_svcmux_free(NEM_svcmux_t *this)
 		}
 	}
 	free(this->handlers);
+
+	if (NULL != this->default_handler) {
+		NEM_thunk_free(this->default_handler);
+	}
+
 	this->refcount = -1000;
 }
 
@@ -88,6 +93,16 @@ NEM_svcmux_add_handlers(
 }
 
 void
+NEM_svcmux_set_default(NEM_svcmux_t *this, NEM_thunk_t *thunk)
+{
+	if (NULL != this->default_handler) {
+		NEM_thunk_free(this->default_handler);
+	}
+
+	this->default_handler = thunk;
+}
+
+void
 NEM_svcmux_unref(NEM_svcmux_t *this)
 {
 	if (0 > this->refcount) {
@@ -115,5 +130,5 @@ NEM_svcmux_resolve(
 		}
 	}
 
-	return NULL;
+	return this->default_handler;
 }
