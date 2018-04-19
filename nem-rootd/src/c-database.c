@@ -2,16 +2,15 @@
 #include <sqlite3.h>
 
 #include "nem.h"
-#include "state.h"
-#include "lifecycle.h"
+#include "c-state.h"
 #include "c-database.h"
 #include "utils.h"
 
 static char *database_path = NULL;
 static sqlite3 *database = NULL;
 
-NEM_err_t
-setup(NEM_app_t *app)
+static NEM_err_t
+setup(NEM_app_t *app, int argc, char *argv[])
 {
 	NEM_err_t err = NEM_path_join(
 		&database_path,
@@ -57,8 +56,8 @@ setup(NEM_app_t *app)
 	return NEM_err_none;
 }
 
-void
-teardown()
+static void
+teardown(NEM_app_t *app)
 {
 	if (NULL != database) {
 		sqlite3_close(database);
@@ -180,7 +179,7 @@ done:
 	return err;
 }
 
-const NEM_rootd_comp_t NEM_rootd_c_database = {
+const NEM_app_comp_t NEM_rootd_c_database = {
 	.name     = "c-database",
 	.setup    = &setup,
 	.teardown = &teardown,

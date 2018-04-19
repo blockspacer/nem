@@ -6,10 +6,9 @@
 #include <mbedtls/sha256.h>
 
 #include "nem.h"
-#include "lifecycle.h"
-#include "state.h"
 #include "imgset.h"
 #include "utils.h"
+#include "c-state.h"
 #include "c-database.h"
 
 static char *images_path = NULL;
@@ -321,7 +320,7 @@ done:
 }
 
 static NEM_err_t
-setup(NEM_app_t *app)
+setup(NEM_app_t *app, int argc, char *argv[])
 {
 	if (NEM_rootd_verbose()) {
 		printf("c-images: setup\n");
@@ -379,7 +378,7 @@ setup(NEM_app_t *app)
 }
 
 static bool
-try_shutdown()
+try_shutdown(NEM_app_t *app)
 {
 	if (NEM_rootd_verbose()) {
 		printf("c-images: try-shutdown\n");
@@ -389,7 +388,7 @@ try_shutdown()
 }
 
 static void
-teardown()
+teardown(NEM_app_t *app)
 {
 	if (NEM_rootd_verbose()) {
 		printf("c-images: teardown\n");
@@ -402,7 +401,7 @@ teardown()
 	free(shared_mounts_path);
 }
 
-const NEM_rootd_comp_t NEM_rootd_c_images = {
+const NEM_app_comp_t NEM_rootd_c_images = {
 	.name         = "c-images",
 	.setup        = &setup,
 	.try_shutdown = &try_shutdown,

@@ -5,7 +5,7 @@
 #include <getopt.h>
 
 #include "nem.h"
-#include "state.h"
+#include "c-state.h"
 #include "utils.h"
 
 static bool is_init = false;
@@ -174,8 +174,8 @@ check_options()
 	return NEM_err_none;
 }
 
-NEM_err_t
-NEM_rootd_state_init(int argc, char *argv[])
+static NEM_err_t
+setup(NEM_app_t *app, int argc, char *argv[])
 {
 	if (1 == getpid()) {
 		is_init = true;
@@ -212,13 +212,19 @@ NEM_rootd_state_init(int argc, char *argv[])
 	return NEM_err_none;
 }
 
-void
-NEM_rootd_state_close()
+static void
+teardown()
 {
 	free(rootd_path);
 	free(jail_root);
 	free(routerd_path);
 }
+
+const NEM_app_comp_t NEM_rootd_c_state = {
+	.name     = "c-state",
+	.setup    = &setup,
+	.teardown = &teardown,
+};
 
 bool
 NEM_rootd_verbose()

@@ -1,9 +1,8 @@
 #include "nem.h"
-#include "lifecycle.h"
-#include "state.h"
+#include "c-state.h"
 
 static NEM_err_t
-setup(NEM_app_t *app)
+setup(NEM_app_t *app, int argc, char *argv[])
 {
 	if (NEM_rootd_verbose()) {
 		printf("c-jails: setup\n");
@@ -13,7 +12,7 @@ setup(NEM_app_t *app)
 }
 
 static bool
-try_shutdown()
+try_shutdown(NEM_app_t *app)
 {
 	if (NEM_rootd_verbose()) {
 		printf("c-jails: try-shutdown\n");
@@ -23,14 +22,14 @@ try_shutdown()
 }
 
 static void
-teardown()
+teardown(NEM_app_t *app)
 {
 	if (NEM_rootd_verbose()) {
 		printf("c-jails: teardown\n");
 	}
 }
 
-const NEM_rootd_comp_t NEM_rootd_c_jails = {
+const NEM_app_comp_t NEM_rootd_c_jails = {
 	.name         = "c-jails",
 	.setup        = &setup,
 	.try_shutdown = &try_shutdown,

@@ -1,14 +1,13 @@
 #include "nem.h"
-#include "lifecycle.h"
-#include "state.h"
 #include "utils.h"
+#include "c-state.h"
 
 static int lock_fd;
 static const char *lock_name = "lockfile";
 static char *lock_path = NULL;
 
 static NEM_err_t
-setup(NEM_app_t *app)
+setup(NEM_app_t *app, int argc, char *argv[])
 {
 	if (NEM_rootd_verbose()) {
 		printf("c-lockfile: setup\n");
@@ -45,7 +44,7 @@ setup(NEM_app_t *app)
 }
 
 static void
-teardown()
+teardown(NEM_app_t *app)
 {
 	if (NEM_rootd_verbose()) {
 		printf("c-lockfile: teardown\n");
@@ -65,7 +64,7 @@ teardown()
 	free(lock_path);
 }
 
-const NEM_rootd_comp_t NEM_rootd_c_lockfile = {
+const NEM_app_comp_t NEM_rootd_c_lockfile = {
 	.name     = "c-lockfile",
 	.setup    = &setup,
 	.teardown = &teardown,
