@@ -5,13 +5,35 @@
 #define M(F) NEM_MSIZE(TYPE, F)
 #define NAME(t) #t
 
-#define TYPE NEM_svc_router_bind_t
-static const NEM_marshal_field_t router_bind_fs[] = {
-	{ "port",          NEM_MARSHAL_INT32,  O(port),          -1, NULL },
-	{ "proto",         NEM_MARSHAL_STRING, O(proto),         -1, NULL },
+#define TYPE NEM_svc_router_bind_cert_t
+static const NEM_marshal_field_t router_bind_cert_fs[] = {
 	{ "cert_pem",      NEM_MARSHAL_STRING, O(cert_pem),      -1, NULL },
 	{ "key_pem",       NEM_MARSHAL_STRING, O(key_pem),       -1, NULL },
 	{ "client_ca_pem", NEM_MARSHAL_STRING, O(client_ca_pem), -1, NULL },
+};
+const NEM_marshal_map_t NEM_svc_router_bind_cert_m = {
+	.fields     = router_bind_cert_fs,
+	.fields_len = NEM_ARRSIZE(router_bind_cert_fs),
+	.elem_size  = sizeof(TYPE),
+	.type_name  = NAME(TYPE),
+};
+#undef TYPE
+
+#define TYPE NEM_svc_router_bind_t
+static const NEM_marshal_field_t router_bind_fs[] = {
+	{ "port",          NEM_MARSHAL_INT32,  O(port),          -1, NULL },
+	{
+		"protos",
+		NEM_MARSHAL_STRING|NEM_MARSHAL_ARRAY,
+		O(protos), O(protos_len),
+		NULL
+	},
+	{
+		"certs",
+		NEM_MARSHAL_STRUCT|NEM_MARSHAL_ARRAY,
+		O(certs),  O(certs_len),
+		&NEM_svc_router_bind_cert_m
+	},
 };
 const NEM_marshal_map_t NEM_svc_router_bind_m = {
 	.fields     = router_bind_fs,

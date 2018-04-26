@@ -197,11 +197,16 @@ routerd_send_port(port_t *port)
 
 	void *req_bs;
 	size_t req_len;
-	NEM_svc_router_bind_t req = {
-		.port     = port->port,
-		.proto    = port->proto,
+	NEM_svc_router_bind_cert_t cert = {
 		.cert_pem = port->cert,
 		.key_pem  = port->key,
+	};
+	NEM_svc_router_bind_t req = {
+		.port       = port->port,
+		.protos     = &port->proto,
+		.protos_len = 1,
+		.certs      = (port->cert != NULL) ? &cert : NULL,
+		.certs_len  = (port->cert != NULL) ? 1 : 0,
 	};
 	NEM_panic_if_err(NEM_marshal_bson(
 		&NEM_svc_router_bind_m,
