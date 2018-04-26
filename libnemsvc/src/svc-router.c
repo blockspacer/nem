@@ -1,9 +1,6 @@
 #include "nemsvc.h"
 #include "nem.h"
-
-#define O(F) offsetof(TYPE, F)
-#define M(F) NEM_MSIZE(TYPE, F)
-#define NAME(t) #t
+#include "nemsvc-macros.h"
 
 #define TYPE NEM_svc_router_bind_cert_t
 static const NEM_marshal_field_t router_bind_cert_fs[] = {
@@ -11,12 +8,7 @@ static const NEM_marshal_field_t router_bind_cert_fs[] = {
 	{ "key_pem",       NEM_MARSHAL_STRING, O(key_pem),       -1, NULL },
 	{ "client_ca_pem", NEM_MARSHAL_STRING, O(client_ca_pem), -1, NULL },
 };
-const NEM_marshal_map_t NEM_svc_router_bind_cert_m = {
-	.fields     = router_bind_cert_fs,
-	.fields_len = NEM_ARRSIZE(router_bind_cert_fs),
-	.elem_size  = sizeof(TYPE),
-	.type_name  = NAME(TYPE),
-};
+MAP(NEM_svc_router_bind_cert_m, router_bind_cert_fs);
 #undef TYPE
 
 #define TYPE NEM_svc_router_bind_t
@@ -35,12 +27,7 @@ static const NEM_marshal_field_t router_bind_fs[] = {
 		&NEM_svc_router_bind_cert_m
 	},
 };
-const NEM_marshal_map_t NEM_svc_router_bind_m = {
-	.fields     = router_bind_fs,
-	.fields_len = NEM_ARRSIZE(router_bind_fs),
-	.elem_size  = sizeof(TYPE),
-	.type_name  = NAME(TYPE),
-};
+MAP(NEM_svc_router_bind_m, router_bind_fs);
 #undef TYPE
 
 #define TYPE NEM_svc_router_register_svc_t
@@ -48,12 +35,7 @@ static const NEM_marshal_field_t router_register_svc_fs[] = {
 	{ "svc_id", NEM_MARSHAL_UINT16, O(svc_id), -1, NULL },
 	{ "inst",   NEM_MARSHAL_STRING, O(inst),   -1, NULL },
 };
-const NEM_marshal_map_t NEM_svc_router_register_svc_m = {
-	.fields     = router_register_svc_fs,
-	.fields_len = NEM_ARRSIZE(router_register_svc_fs),
-	.elem_size  = sizeof(TYPE),
-	.type_name  = NAME(TYPE),
-};
+MAP(NEM_svc_router_register_svc_m, router_register_svc_fs);
 #undef TYPE
 
 #define TYPE NEM_svc_router_register_http_t
@@ -62,10 +44,5 @@ static const NEM_marshal_field_t router_register_http_fs[] = {
 	{ "base", NEM_MARSHAL_STRING, O(base), -1, NULL },
 	{ "inst", NEM_MARSHAL_STRING, O(inst), -1, NULL },
 };
-const NEM_marshal_map_t NEM_svc_router_register_http_m = {
-	.fields     = router_register_http_fs,
-	.fields_len = NEM_ARRSIZE(router_register_http_fs),
-	.elem_size  = sizeof(TYPE),
-	.type_name  = NAME(TYPE),
-};
+MAP(NEM_svc_router_register_http_m, router_register_http_fs);
 #undef TYPE

@@ -15,6 +15,8 @@ static const cmd_data_t daemon_cmds[] = {
 };
 
 static const cmd_data_t host_cmds[] = {
+	{ NEM_cmdid_host_bind,    "bind"    },
+	{ NEM_cmdid_host_connect, "connect" },
 };
 
 static const cmd_data_t router_cmds[] = {
