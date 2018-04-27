@@ -1,6 +1,6 @@
 #include "nemsvc.h"
 #include "nem.h"
-#include "nemsvc-macros.h"
+#include "nem-marshal-macros.h"
 
 #define TYPE NEM_svc_host_bind_req_t
 static const NEM_marshal_field_t host_bind_req_fs[] = {

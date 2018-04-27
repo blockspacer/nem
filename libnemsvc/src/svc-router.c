@@ -1,6 +1,6 @@
 #include "nemsvc.h"
 #include "nem.h"
-#include "nemsvc-macros.h"
+#include "nem-marshal-macros.h"
 
 #define TYPE NEM_svc_router_bind_cert_t
 static const NEM_marshal_field_t router_bind_cert_fs[] = {
