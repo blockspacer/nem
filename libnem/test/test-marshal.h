@@ -1,7 +1,5 @@
 #pragma once
-
-#define O(F) offsetof(TYPE, F)
-#define M(F) NEM_MSIZE(TYPE, F)
+#include "nem-marshal-macros.h"
 
 /*
  * marshal_prims_t
@@ -65,11 +63,7 @@ static const NEM_marshal_field_t marshal_prims_fs[] = {
 	{ "i64", NEM_MARSHAL_INT64,  O(i64), -1, NULL },
 	{ "b",   NEM_MARSHAL_BOOL,   O(b),   -1, NULL },
 };
-static const NEM_marshal_map_t marshal_prims_m = {
-	.fields     = marshal_prims_fs,
-	.fields_len = NEM_ARRSIZE(marshal_prims_fs),
-	.elem_size  = sizeof(TYPE),
-};
+static MAP(marshal_prims_m, marshal_prims_fs);
 #undef TYPE
 
 /*
@@ -173,11 +167,7 @@ static const NEM_marshal_field_t marshal_prims_ary_fs[] = {
 	{ "i64s", NEM_MARSHAL_ARRAY|NEM_MARSHAL_INT64,  O(i64s), O(i64_len), NULL },
 	{ "ss",   NEM_MARSHAL_ARRAY|NEM_MARSHAL_STRING, O(ss),   O(s_len),   NULL }
 };
-static const NEM_marshal_map_t marshal_prims_ary_m = {
-	.fields     = marshal_prims_ary_fs,
-	.fields_len = NEM_ARRSIZE(marshal_prims_ary_fs),
-	.elem_size  = sizeof(TYPE),
-};
+static MAP(marshal_prims_ary_m, marshal_prims_ary_fs);
 #undef TYPE
 
 /*
@@ -238,11 +228,7 @@ static const NEM_marshal_field_t marshal_strs_fs[] = {
 	{ "s2", NEM_MARSHAL_STRING, O(s2), -1, NULL },
 	{ "s3", NEM_MARSHAL_STRING, O(s3), -1, NULL },
 };
-static const NEM_marshal_map_t marshal_strs_m = {
-	.fields     = marshal_strs_fs,
-	.fields_len = NEM_ARRSIZE(marshal_strs_fs),
-	.elem_size  = sizeof(TYPE),
-};
+static MAP(marshal_strs_m, marshal_strs_fs);
 #undef TYPE
 
 /*
@@ -290,11 +276,7 @@ static const NEM_marshal_field_t marshal_bin_fs[] = {
 	{ "b", NEM_MARSHAL_BINARY, O(b), O(blen), NULL },
 	{ "f", NEM_MARSHAL_FIXLEN, O(f), M(f),    NULL },
 };
-static const NEM_marshal_map_t marshal_bin_m = {
-	.fields     = marshal_bin_fs,
-	.fields_len = NEM_ARRSIZE(marshal_bin_fs),
-	.elem_size  = sizeof(TYPE),
-};
+static MAP(marshal_bin_m, marshal_bin_fs);
 #undef TYPE
 
 /*
@@ -330,11 +312,7 @@ static const NEM_marshal_field_t marshal_obj_fs[] = {
 	{ "prim", NEM_MARSHAL_STRUCT, O(prim), -1, &marshal_prims_m },
 	{ "strs", NEM_MARSHAL_STRUCT, O(strs), -1, &marshal_strs_m  },
 };
-static const NEM_marshal_map_t marshal_obj_m = {
-	.fields     = marshal_obj_fs,
-	.fields_len = NEM_ARRSIZE(marshal_obj_fs),
-	.elem_size  = sizeof(TYPE),
-};
+static MAP(marshal_obj_m, marshal_obj_fs);
 #undef TYPE
 
 /*
@@ -410,11 +388,7 @@ static const NEM_marshal_field_t marshal_aryobj_sub_fs[] = {
 	{ "i", NEM_MARSHAL_INT64,  O(i), -1, NULL },
 	{ "s", NEM_MARSHAL_STRING, O(s), -1, NULL },
 };
-static const NEM_marshal_map_t marshal_aryobj_sub_m = {
-	.fields     = marshal_aryobj_sub_fs,
-	.fields_len = NEM_ARRSIZE(marshal_aryobj_sub_fs),
-	.elem_size  = sizeof(TYPE),
-};
+static MAP(marshal_aryobj_sub_m, marshal_aryobj_sub_fs);
 #undef TYPE
 #define TYPE marshal_aryobj_t
 static const NEM_marshal_field_t marshal_aryobj_fs[] = {
@@ -423,11 +397,7 @@ static const NEM_marshal_field_t marshal_aryobj_fs[] = {
 		O(objs), O(len), &marshal_aryobj_sub_m
 	},
 };
-static const NEM_marshal_map_t marshal_aryobj_m = {
-	.fields     = marshal_aryobj_fs,
-	.fields_len = NEM_ARRSIZE(marshal_aryobj_fs),
-	.elem_size  = sizeof(TYPE),
-};
+static MAP(marshal_aryobj_m, marshal_aryobj_fs);
 #undef TYPE
 
 typedef struct {

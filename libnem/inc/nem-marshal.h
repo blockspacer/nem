@@ -24,15 +24,19 @@ NEM_marshal_type_t;
 // This is to simplify the marshalling logic since for some formats these
 // are all basically the same code (since several formats just expand them
 // out to int/uint64_t and we truncate them on the C side).
-#define NEM_MARSHAL_CASE_VISIT_INT_TYPES \
-	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT8, uint8_t); \
-	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT16, uint16_t); \
-	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT32, uint32_t); \
-	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT64, uint64_t); \
+#define NEM_MARSHAL_CASE_VISIT_SINT_TYPES \
 	NEM_MARSHAL_VISITOR(NEM_MARSHAL_INT8, int8_t); \
 	NEM_MARSHAL_VISITOR(NEM_MARSHAL_INT16, int16_t); \
 	NEM_MARSHAL_VISITOR(NEM_MARSHAL_INT32, int32_t); \
 	NEM_MARSHAL_VISITOR(NEM_MARSHAL_INT64, int64_t);
+#define NEM_MARSHAL_CASE_VISIT_UINT_TYPES \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT8, uint8_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT16, uint16_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT32, uint32_t); \
+	NEM_MARSHAL_VISITOR(NEM_MARSHAL_UINT64, uint64_t);
+#define NEM_MARSHAL_CASE_VISIT_INT_TYPES \
+	NEM_MARSHAL_CASE_VISIT_SINT_TYPES \
+	NEM_MARSHAL_CASE_VISIT_UINT_TYPES
 
 // NB: NEM_marshal_type_t values cannot exceed the 32 currently -- both the
 // typemask and the array flag need to be made larger to handle those values.
@@ -153,6 +157,24 @@ NEM_unmarshal_json(
 );
 NEM_err_t
 NEM_marshal_json(
+	const NEM_marshal_map_t *this,
+	void                   **out,
+	size_t                  *out_len,
+	const void              *elem,
+	size_t                   elem_len
+);
+
+// NEM_unmarshal_yaml is. yep.
+NEM_err_t
+NEM_unmarshal_yaml(
+	const NEM_marshal_map_t *this,
+	void                    *elem,
+	size_t                   elem_len,
+	const void              *json,
+	size_t                   json_len
+);
+NEM_err_t
+NEM_marshal_yaml(
 	const NEM_marshal_map_t *this,
 	void                   **out,
 	size_t                  *out_len,

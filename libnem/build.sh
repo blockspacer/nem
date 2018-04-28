@@ -17,6 +17,7 @@ LIBS="
 	-lz
 	-lbson-1.0
 	-ljson-c
+	-lyaml
 	-licuuc
 	-lcxxrt
 	../../libtoml2/bin/libtoml2.a
