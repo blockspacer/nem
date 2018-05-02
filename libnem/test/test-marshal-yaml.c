@@ -27,11 +27,12 @@ static const char
 		"- 2352\n"
 		"ss:\n"
 		"- hello\n"
-		"- \n"
+		"- ~\n"
 		"- world\n"
 		"- \n",
 	*marshal_strs_yaml =
-		"s1: hello\n",
+		"s1: hello\n"
+		"s2: \n",
 	*marshal_obj_yaml =
 		"prim:\n"
 		"  u8: 8\n"
@@ -44,7 +45,8 @@ static const char
 		"  i64: -64\n"
 		"  b: y\n"
 		"strs:\n"
-		"  s1: hello\n",
+		"  s1: hello\n"
+		"  s2: \n",
 	*marshal_aryobj_yaml =
 		"objs:\n"
 		"- i: 42\n"
@@ -103,10 +105,55 @@ START_TEST(marshal_null_string)
 	));
 	ck_assert_ptr_ne(NULL, bs);
 	ck_assert_int_ne(0, bs_len);
-	ck_assert_str_eq("strings:\n- \n- \n", bs);
+	ck_assert_str_eq("strings:\n- \n- ~\n", bs);
 	free(bs);
 }
 END_TEST
+
+static void
+test_yaml_rt_empty(
+	const NEM_marshal_map_t *map,
+	marshal_cmp_fn           cmp_fn
+) {
+	void *bs_in = NEM_malloc(map->elem_size);
+	void *bs_out = NEM_malloc(map->elem_size);
+
+	void *yaml = NULL;
+	size_t len = 0;
+	ck_err(NEM_marshal_yaml(map, &yaml, &len, bs_in, map->elem_size));
+	ck_err(NEM_unmarshal_yaml(map, bs_out, map->elem_size, yaml, len));
+
+	cmp_fn(bs_in, bs_out);
+	NEM_unmarshal_free(map, bs_in, map->elem_size);
+	NEM_unmarshal_free(map, bs_out, map->elem_size);
+	free(yaml);
+	free(bs_in);
+	free(bs_out);
+}
+
+static void
+test_yaml_rt_init(
+	const NEM_marshal_map_t *map,
+	marshal_cmp_fn           cmp_fn,
+	marshal_init_fn          init_fn
+) {
+	void *bs_in = NEM_malloc(map->elem_size);
+	init_fn(bs_in);
+
+	void *bs_out = NEM_malloc(map->elem_size);
+
+	void *yaml = NULL;
+	size_t len = 0;
+	ck_err(NEM_marshal_yaml(map, &yaml, &len, bs_in, map->elem_size));
+	ck_err(NEM_unmarshal_yaml(map, bs_out, map->elem_size, yaml, len));
+
+	cmp_fn(bs_in, bs_out);
+	NEM_unmarshal_free(map, bs_in, map->elem_size);
+	NEM_unmarshal_free(map, bs_out, map->elem_size);
+	free(yaml);
+	free(bs_in);
+	free(bs_out);
+}
 
 #define MARSHAL_VISITOR(TY) \
 	START_TEST(yaml_unmarshal_##TY) { \
@@ -116,6 +163,12 @@ END_TEST
 			&TY##_init, \
 			&TY##_cmp \
 		); \
+	} END_TEST \
+	START_TEST(yaml_rt_empty_##TY) { \
+		test_yaml_rt_empty(&TY##_m, &TY##_cmp); \
+	} END_TEST \
+	START_TEST(yaml_rt_init_##TY) { \
+		test_yaml_rt_init(&TY##_m, &TY##_cmp, &TY##_init); \
 	} END_TEST
 
 	MARSHAL_VISIT_TYPES_NOBIN
@@ -127,7 +180,9 @@ suite_marshal_yaml()
 	tcase_t tests[] = {
 		{ "marshal_null_string", &marshal_null_string },
 #		define MARSHAL_VISITOR(TY) \
-		{ "yaml_unmarshal_" #TY, &yaml_unmarshal_##TY },
+		{ "yaml_unmarshal_" #TY, &yaml_unmarshal_##TY }, \
+		{ "yaml_rt_empty_"#TY,   &yaml_rt_empty_##TY  }, \
+		{ "yaml_rt_init_"#TY,    &yaml_rt_init_##TY   },
 
 		MARSHAL_VISIT_TYPES_NOBIN
 #		undef MARSHAL_VISITOR

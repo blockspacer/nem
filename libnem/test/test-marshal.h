@@ -478,6 +478,9 @@ marshal_ptrs_cmp(const void *vthis, const void *vthat)
 		if (s_this_null) {
 			ck_assert(s_that_null);
 		}
+		else if (s_that_null) {
+			ck_assert(s_this_null);
+		}
 		else {
 			ck_assert_ptr_ne(s_this, s_that);
 			ck_assert_ptr_ne(*s_this, *s_that);
