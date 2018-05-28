@@ -3,6 +3,7 @@
 typedef struct {
 	const char *own_path;
 	const char *config_path;
+	bool initialized;
 	bool verbose;
 }
 NEM_hostd_args_t;
