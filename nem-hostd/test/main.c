@@ -2,13 +2,11 @@
 
 typedef Suite*(*suite_def)();
 
-/*
 extern Suite 
-	*suite_jd(),
-	*suite_imgset();
-*/
+	*suite_args();
 
 static suite_def suites[] = {
+	suite_args,
 };
 
 int

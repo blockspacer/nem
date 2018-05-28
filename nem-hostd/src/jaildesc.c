@@ -157,6 +157,7 @@ NEM_hostd_jailimg_type(const NEM_hostd_jailimg_t *this)
 static const NEM_marshal_field_t  NEM_hostd_jaildesc_fs[] = {
 	{ "jail_id",      NEM_MARSHAL_STRING, O(jail_id),      -1, NULL },
 	{ "want_running", NEM_MARSHAL_BOOL,   O(want_running), -1, NULL },
+	{ "exe_path",     NEM_MARSHAL_STRING, O(exe_path),     -1, NULL },
 	{
 		"isolation_flags",
 		NEM_MARSHAL_STRING|NEM_MARSHAL_ARRAY,

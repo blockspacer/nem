@@ -56,6 +56,7 @@ typedef struct {
 	bool                 want_running;
 	const char         **isolation_flags;
 	size_t               isolation_flags_len;
+	const char          *exe_path;
 	NEM_hostd_jailimg_t *images;
 	size_t               images_len;
 }
