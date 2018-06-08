@@ -1,7 +1,3 @@
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-
 #include "nem.h"
 #include "nem-marshal-macros.h"
 #include "config.h"
@@ -49,34 +45,8 @@ config_free(NEM_hostd_config_t *this)
 }
 
 static NEM_err_t
-map_alloc_file(const char *path, char **out_bs, size_t *out_len)
-{
-	int fd = open(path, O_RDONLY|O_CLOEXEC);
-	if (0 > fd) {
-		return NEM_err_errno();
-	}
-
-	struct stat sb;
-	if (0 > fstat(fd, &sb)) {
-		close(fd);
-		return NEM_err_errno();
-	}
-
-	*out_len = sb.st_size;
-	*out_bs = mmap(NULL, *out_len, PROT_READ, MAP_NOCORE, fd, 0);
-	if (MAP_FAILED == *out_bs) {
-		close(fd);
-		return NEM_err_errno();
-	}
-
-	return NEM_err_none;
-}
-
-static NEM_err_t
 open_jail_config(NEM_hostd_config_jail_t *this, NEM_hostd_config_t *cfg)
 {
-	char *config_bs;
-	size_t config_len;
 	char *config_path = NULL;
 	asprintf(
 		&config_path,
@@ -84,11 +54,11 @@ open_jail_config(NEM_hostd_config_jail_t *this, NEM_hostd_config_t *cfg)
 		cfg->configdir,
 		this->config
 	);
-	NEM_panic_if_null(asprintf);
-	NEM_err_t err = map_alloc_file(config_path, &config_bs, &config_len);
-	free(config_path);
 
+	NEM_file_t file;
+	NEM_err_t err = NEM_file_init(&file, config_path);
 	if (!NEM_err_ok(err)) {
+		free(config_path);
 		return err;
 	}
 
@@ -97,10 +67,10 @@ open_jail_config(NEM_hostd_config_jail_t *this, NEM_hostd_config_t *cfg)
 		&NEM_hostd_config_jail_m,
 		this->img_config,
 		sizeof(*this->img_config),
-		config_bs,
-		config_len
+		NEM_file_data(&file),
+		NEM_file_len(&file)
 	);
-	munmap(config_bs, config_len);
+	NEM_file_free(&file);
 
 	return err;
 }
@@ -117,9 +87,8 @@ setup(NEM_app_t *app, int argc, char *argv[])
 		config_path = "config.yaml";
 	}
 
-	char *config_bs;
-	size_t config_len;
-	NEM_err_t err = map_alloc_file(config_path, &config_bs, &config_len);
+	NEM_file_t file;
+	NEM_err_t err = NEM_file_init(&file, config_path);
 	if (!NEM_err_ok(err)) {
 		return err;
 	}
@@ -128,11 +97,11 @@ setup(NEM_app_t *app, int argc, char *argv[])
 		&NEM_hostd_config_m,
 		&static_config,
 		sizeof(static_config),
-		config_bs,
-		config_len
+		NEM_file_data(&file),
+		NEM_file_len(&file)
 	);
 
-	munmap(config_bs, config_len);
+	NEM_file_free(&file);
 
 	if (!NEM_err_ok(err)) {
 		config_free(&static_config);
