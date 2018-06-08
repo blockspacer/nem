@@ -3,6 +3,8 @@
 #include <sys/event.h>
 #include <sys/tree.h>
 #include <sys/time.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <netinet/in.h>
@@ -31,6 +33,7 @@
 #include "nem-marshal.h"
 #include "nem-stream.h"
 #include "nem-fd.h"
+#include "nem-file.h"
 #include "nem-list.h"
 #include "nem-dial.h"
 #include "nem-msghdr.h"
