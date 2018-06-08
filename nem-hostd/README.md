@@ -1,23 +1,77 @@
 # nem-hostd
 
+## directory structures
+
+ * `config.yaml` lives anywhere. It can be named anything, the path is
+   specified via manditory command-line argument.
+ * `config.yaml:rundir` specifies the runtime root directory.
+ * `config.yaml:configdir` defaults to `$rundir/config` and specifies the
+   root directory for config files.
+
+It's expected that there will be two main directories: configs and runtime
+state. Configs should likely be shared between all hosts; ideally by living
+in a shared git repo with signed and verified commits. The structure for
+this config depot should look like
+
+```
+/hosts
+  /host1.yaml
+  /host2.yaml
+/jails
+  /jailname1.yaml
+  /jailname2.yaml
+```
+
+The `hosts` directory contains the per-host `config.yaml` files. The `jails`
+directory contains the per-jail template files.
+
+The runtime directory structure should look like
+
+```
+/images
+  /sha256
+    /<sha256>.img
+  /name
+    /<symlink to sha256>
+  /vnode
+    /<name>.img
+  /mounts
+    /ro
+      /<sha256>
+    /shared
+      /<name>
+/running
+  /jailname
+/config # optional
+```
+
+This should mostly be self-explanatory. I'm not entirely sure if the symlinks
+here make sense; there's likely additional per-image metadata we want to store
+and it if so we'd need an sqlite3 database for it (thus making on-disk
+metadata storage redundant).
+
 ## config.yaml
 
 ```
-# rootdir is the root directory for the daemon to run in; all paths are
-# relative to the rootdir. A bunch of stuff gets dumped in here. Maybe it
+# rundir is the root directory for the daemon to run in; all paths are
+# relative to the rundir. A bunch of stuff gets dumped in here. Maybe it
 # should be configurable later.
-rootdir: /usr/local/nem
+rundir: /usr/local/nem
+
+# configdir specifies the root directory for configuration. By default,
+# this is just set to $rundir/config.
+rundir: /usr/local/etc/nem
 
 # jails contains a list of jail objects that should run under this host
 jails:
     # name is an arbitrary name for the jail.
   - name: foo
     # config is a symbolic reference to the jail config that should be
-    # loaded for this jail.
+    # loaded for this jail. ".yaml" is appended automatically.
     config: foo 
 ```
 
-## jails/jailname.yaml
+## $rundir/config/jails/jailname.yaml
 
 ```
 # jail_id is the symbolic name for this jail.

@@ -170,8 +170,8 @@ NEM_unmarshal_yaml(
 	const NEM_marshal_map_t *this,
 	void                    *elem,
 	size_t                   elem_len,
-	const void              *json,
-	size_t                   json_len
+	const void              *yaml,
+	size_t                   yaml_len
 );
 NEM_err_t
 NEM_marshal_yaml(
