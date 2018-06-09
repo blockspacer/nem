@@ -15,10 +15,15 @@ NEM_file_init(NEM_file_t *this, const char *path)
 		return NEM_err_errno();
 	}
 
-	void *data = mmap(NULL, this->stat.st_size, PROT_READ, MAP_NOCORE, fd, 0);
-	if (MAP_FAILED == data) {
-		close(fd);
-		return NEM_err_errno();
+	void *data = NULL;
+
+	if (0 < this->stat.st_size) {
+		// NB: mmap returns EINVAL for size=0.
+		data = mmap(NULL, this->stat.st_size, PROT_READ, MAP_NOCORE, fd, 0);
+		if (MAP_FAILED == data) {
+			close(fd);
+			return NEM_err_errno();
+		}
 	}
 
 	close(fd);
