@@ -76,6 +76,30 @@ open_jail_config(NEM_hostd_config_jail_t *this, NEM_hostd_config_t *cfg)
 }
 
 static NEM_err_t
+ensure_dir(const char *path)
+{
+	struct stat st = {0};
+
+	if (0 != stat(path, &st)) {
+		if (ENOENT == errno) {
+			if (0 != mkdir(path, 0770)) {
+				return NEM_err_errno();
+			}
+
+			return NEM_err_none;
+		}
+
+		return NEM_err_errno();
+	}
+
+	if (!S_ISDIR(st.st_mode)) {
+		return NEM_err_static("ensure_dir: path is something else");
+	}
+
+	return NEM_err_none;
+}
+
+static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])
 {
 	static_config.is_init = (1 == getpid());
@@ -90,7 +114,15 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	NEM_file_t file;
 	NEM_err_t err = NEM_file_init(&file, config_path);
 	if (!NEM_err_ok(err)) {
-		return err;
+		NEM_panicf(
+			"error: unable to find config at %s: %s",
+			config_path,
+			NEM_err_string(err)
+		);
+	}
+	if (0 == NEM_file_len(&file)) {
+		NEM_file_free(&file);
+		return NEM_err_static("config file is empty");
 	}
 
 	err = NEM_unmarshal_yaml(
@@ -100,9 +132,31 @@ setup(NEM_app_t *app, int argc, char *argv[])
 		NEM_file_data(&file),
 		NEM_file_len(&file)
 	);
-
 	NEM_file_free(&file);
+	if (!NEM_err_ok(err)) {
+		config_free(&static_config);
+		return err;
+	}
 
+	// If rundir isn't set, err, I guess it's the current directory?
+	if (NULL == static_config.rundir) {
+		static_config.rundir = strdup("./");
+	}
+	err = ensure_dir(static_config.rundir);
+	if (!NEM_err_ok(err)) {
+		config_free(&static_config);
+		return err;
+	}
+
+	// If configdir is unset, default it to rundir/config.
+	if (NULL == static_config.configdir) {
+		asprintf(
+			(char**)&static_config.configdir,
+			"%s/config/",
+			static_config.rundir
+		);
+	}
+	err = ensure_dir(static_config.configdir);
 	if (!NEM_err_ok(err)) {
 		config_free(&static_config);
 		return err;
