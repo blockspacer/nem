@@ -8,111 +8,7 @@
 #include "c-state.h"
 #include "utils.h"
 
-static bool is_init = false;
-static bool is_root = false;
-static int verbose = 0;
-static int capsicum = 0;
-static int reload = 0;
-static char *rootd_path = NULL;
-static char *routerd_path = NULL;
-static char *jail_root = NULL;
-
-enum {
-	OPT_VERBOSE,
-	OPT_RELOAD,
-	OPT_CAPSICUM,
-	OPT_ROUTERD_PATH,
-	OPT_JAIL_ROOT,
-};
-static struct option longopts[] = {
-	{ "verbose",   optional_argument, &verbose,  'v' },
-	{ "reload",    optional_argument, &reload,    0  },
-	{ "capsicum",  optional_argument, &capsicum, 'c' },
-	{ "routerd",   optional_argument, NULL,       0  },
-	{ "jail-root", optional_argument, NULL,       0  },
-	{ 0 },
-};
-
-static void
-usage()
-{
-	printf(
-		"Usage: %s\n"
-		"  --verbose, -v:    be noisy\n"
-		"  --reload:         internal usage\n"
-		"  --capsicum:       enable capsicum\n"
-		"  --routerd=path:   set path to nem-routerd\n"
-		"  --jail-root=path: set path to jail root dir\n",
-		rootd_path
-	);
-}
-
-static char*
-dupe_arg(int argc, char *argv[])
-{
-	if (NULL != optarg) {
-		return strdup(optarg);
-	}
-	if (optind < argc) {
-		return strdup(argv[optind]);
-	}
-
-	// XXX: Not really a good way to handle this.
-	usage();
-	exit(1);
-}
-
-static NEM_err_t
-parse_options(int argc, char *argv[])
-{
-	rootd_path = strdup(argv[0]);
-
-	char ch = 0;
-	int idx = 0;
-	while (-1 != (ch = getopt_long(argc, argv, "vr0", longopts, &idx))) {
-		switch (ch) {
-			case 'v':
-			case 'c':
-			case 0: 
-				break;
-			default:
-				usage();
-				return NEM_err_static("parse_options: invalid option");
-		}
-		switch (idx) {
-			case OPT_VERBOSE:
-				verbose = 1;
-				break;
-			case OPT_CAPSICUM:
-				capsicum = 1;
-				break;
-			case OPT_RELOAD:
-				reload = 1;
-				break;
-			case OPT_ROUTERD_PATH:
-				routerd_path = dupe_arg(argc, argv);
-				break;
-			case OPT_JAIL_ROOT:
-				jail_root = dupe_arg(argc, argv);
-				break;
-			default:
-				usage();
-				return NEM_err_static("parse_options: invalid option");
-		}
-	}
-
-	// XXX: Don't do this here; check that the default values are valid
-	// before setting them up.
-	if (NULL == routerd_path) {
-		routerd_path = strdup("./nem-routerd");
-	}
-	if (NULL == jail_root) {
-		jail_root = strdup("./jails");
-	}
-
-	return NEM_err_none;
-}
-
+/*
 static mode_t
 get_rights_stat(struct stat *sb)
 {
@@ -173,41 +69,32 @@ check_options()
 
 	return NEM_err_none;
 }
+*/
 
 static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])
 {
-	if (1 == getpid()) {
-		is_init = true;
-	}
-	if (0 == geteuid()) {
-		is_root = true;
-	}
-	NEM_err_t err = parse_options(argc, argv);
-	if (!NEM_err_ok(err)) {
-		return err;
-	}
-
+	/*
 	err = check_options();
 	if (!NEM_err_ok(err)) {
 		return err;
 	}
 
-	if (verbose) {
-		printf(
-			"nem-rootd starting\n"
-			"   pid        = %d\n"
-			"   reload     = %d\n"
-			"   rootd-path = %s\n"
-			"   routerd    = %s\n"
-			"   jail-root  = %s\n",
-			getpid(),
-			reload,
-			rootd_path,
-			routerd_path,
-			jail_root
-		);
-	}
+	NEM_logf(
+		COMP_STATE,
+		"nem-rootd starting\n"
+		"   pid        = %d\n"
+		"   reload     = %d\n"
+		"   rootd-path = %s\n"
+		"   routerd    = %s\n"
+		"   jail-root  = %s\n",
+		getpid(),
+		reload,
+		rootd_path,
+		routerd_path,
+		jail_root
+	);
+	*/
 
 	return NEM_err_none;
 }
@@ -215,9 +102,11 @@ setup(NEM_app_t *app, int argc, char *argv[])
 static void
 teardown()
 {
+	/*
 	free(rootd_path);
 	free(jail_root);
 	free(routerd_path);
+	*/
 }
 
 const NEM_app_comp_t NEM_rootd_c_state = {
@@ -225,28 +114,3 @@ const NEM_app_comp_t NEM_rootd_c_state = {
 	.setup    = &setup,
 	.teardown = &teardown,
 };
-
-bool
-NEM_rootd_verbose()
-{
-	return verbose;
-}
-
-bool
-NEM_rootd_capsicum()
-{
-	return capsicum;
-}
-
-const char*
-NEM_rootd_routerd_path()
-{
-	return routerd_path;
-}
-
-const char*
-NEM_rootd_jail_root()
-{
-	return jail_root;
-}
-

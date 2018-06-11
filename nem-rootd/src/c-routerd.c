@@ -1,6 +1,9 @@
 #include "nem.h"
 #include "nemsvc.h"
+#include "c-log.h"
 #include "c-state.h"
+#include "c-args.h"
+#include "c-config.h"
 #include "svc-daemon.h"
 #include "svc-imghost.h"
 
@@ -29,15 +32,11 @@ static void
 routerd_restart(NEM_thunk1_t *thunk, void *varg)
 {
 	if (!want_running) {
-		if (NEM_rootd_verbose()) {
-			printf("c-routerd: nevermind, leave it dead\n");
-		}
+		NEM_logf(COMP_ROUTERD, "nevermind, leave it dead");
 		return;
 	}
 	if (is_running) {
-		if (NEM_rootd_verbose()) {
-			printf("c-routerd: child resurrected itself?!\n");
-		}
+		NEM_logf(COMP_ROUTERD, "child resurrected itself?!");
 		return;
 	}
 
@@ -45,12 +44,11 @@ routerd_restart(NEM_thunk1_t *thunk, void *varg)
 
 	NEM_err_t err = routerd_start(app);
 	if (!NEM_err_ok(err)) {
-		if (NEM_rootd_verbose()) {
-			printf(
-				"c-routerd: couldn't start child: %s\n",
-				NEM_err_string(err)
-			);
-		}
+		NEM_logf(
+			COMP_ROUTERD,
+			"couldn't start child: %s",
+			NEM_err_string(err)
+		);
 
 		NEM_kq_after(&app->kq, 1000, NEM_thunk1_new_ptr(
 			&routerd_restart,
@@ -70,17 +68,13 @@ on_child_died(NEM_thunk1_t *thunk, void *varg)
 	is_running = false;
 
 	if (!want_running) {
-		if (NEM_rootd_verbose()) {
-			printf("c-routerd: child died? good riddance\n");
-		}
+		NEM_logf(COMP_ROUTERD, "child died? good riddance");
 		return;
 	}
 
 	const int delay_ms = 1000;
 
-	if (NEM_rootd_verbose()) {
-		printf("c-routerd: child died? restarting in %dms\n", delay_ms);
-	}
+	NEM_logf(COMP_ROUTERD, "child died? restarting in %dms", delay_ms);
 
 	NEM_app_t *app = NEM_thunk1_ptr(thunk);
 	NEM_kq_after(&app->kq, delay_ms, NEM_thunk1_new_ptr(
@@ -96,16 +90,12 @@ routerd_enter(NEM_thunk1_t *thunk, void *varg)
 
 	int rand_fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
 	if (0 > rand_fd) {
-		if (NEM_rootd_verbose()) {
-			printf("open /dev/urandom: %s\n", strerror(errno));
-			return;
-		}
+		NEM_logf(COMP_ROUTERD, "open /dev/urandom: %s", strerror(errno));
+		return;
 	}
 	if (0 > dup2(rand_fd, NEM_KQ_PARENT_FILENO + 1)) {
-		if (NEM_rootd_verbose()) {
-			printf("dup2: %s\n", strerror(errno));
-			return;
-		}
+		NEM_logf(COMP_ROUTERD, "dup2: %s", strerror(errno));
+		return;
 	}
 
 	if (!NEM_rootd_capsicum()) {
@@ -113,18 +103,14 @@ routerd_enter(NEM_thunk1_t *thunk, void *varg)
 	}
 
 	if (0 != cap_enter()) {
-		if (NEM_rootd_verbose()) {
-			printf("cap_enter: %s\n", strerror(errno));
-			return;
-		}
+		NEM_logf(COMP_ROUTERD, "cap_enter: %s", strerror(errno));
+		return;
 	}
 
 	cap_rights_t exe_rights;
 	cap_rights_init(&exe_rights, CAP_FEXECVE);
 	if (0 != cap_rights_limit(child->exe_fd, &exe_rights)) {
-		if (NEM_rootd_verbose()) {
-			printf("cap_rights_limit: %s\n", strerror(errno));
-		}
+		NEM_logf(COMP_ROUTERD, "cap_rights_limit: %s\n", strerror(errno));
 	}
 
 	cap_rights_t rights;
@@ -150,10 +136,8 @@ routerd_enter(NEM_thunk1_t *thunk, void *varg)
 		int fd = fds[i];
 
 		if (0 != cap_rights_limit(fd, &rights)) {
-			if (NEM_rootd_verbose()) {
-				printf("cap_rights_limit: %s\n", strerror(errno));
-				return;
-			}
+			NEM_logf(COMP_ROUTERD, "cap_rights_limit: %s\n", strerror(errno));
+			return;
 		}
 	}
 }
@@ -165,24 +149,24 @@ routerd_send_port_cb(NEM_thunk_t *thunk, void *varg)
 	port_t *port = NEM_thunk_inlineptr(thunk);
 	NEM_msghdr_t *hdr = NEM_msg_header(ca->msg);
 
-	if (NEM_rootd_verbose()) {
-		if (!NEM_err_ok(ca->err)) {
-			printf(
-				"c-routerd: error sending port %d: %s\n",
-				port->port,
-				NEM_err_string(ca->err)
-			);
-		}
-		else if (NULL != hdr && NULL != hdr->err) {
-			printf(
-				"c-routerd: error sending port %d: %s\n",
-				port->port,
-				hdr->err->reason ? hdr->err->reason : "(no reason)"
-			);
-		}
-		else {
-			printf("c-routerd: sent port %d\n", port->port);
-		}
+	if (!NEM_err_ok(ca->err)) {
+		NEM_logf(
+			COMP_ROUTERD,
+			"error sending port %d: %s",
+			port->port,
+			NEM_err_string(ca->err)
+		);
+	}
+	else if (NULL != hdr && NULL != hdr->err) {
+		NEM_logf(
+			COMP_ROUTERD,
+			"error sending port %d: %s",
+			port->port,
+			hdr->err->reason ? hdr->err->reason : "(no reason)"
+		);
+	}
+	else {
+		NEM_logf(COMP_ROUTERD, "sent port %d", port->port);
 	}
 
 	NEM_msghdr_free(hdr);
@@ -258,9 +242,7 @@ NEM_rootd_routerd_bind_http(int port)
 	addr.sin_addr.s_addr = INADDR_ANY;
 	if (-1 == bind(fd, (struct sockaddr*) &addr, sizeof(addr))) {
 		close(fd);
-		if (NEM_rootd_verbose()) {
-			printf("c-routerd: unable to bind port %d\n", port);
-		}
+		NEM_logf(COMP_ROUTERD, "unable to bind port %d", port);
 		return NEM_err_errno();
 	}
 	
@@ -320,9 +302,7 @@ routerd_start(NEM_app_t *app)
 
 	NEM_txnmgr_set_mux(&child.txnmgr, &svcs);
 
-	if (NEM_rootd_verbose()) {
-		printf("\nc-routerd: routerd running, pid=%d\n", child.pid); 
-	}
+	NEM_logf(COMP_ROUTERD, "routerd running, pid=%d", child.pid); 
 
 	is_running = true;
 	routerd_send_ports();
@@ -335,16 +315,15 @@ on_unknown_message(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_txn_ca *ca = varg;
 
-	if (NEM_rootd_verbose()) {
-		printf(
-			"c-routerd: unhandled message %s/%s\n",
-			NEM_svcid_to_string(ca->msg->packed.service_id),
-			NEM_cmdid_to_string(
-				ca->msg->packed.service_id,
-				ca->msg->packed.command_id
-			)
-		);
-	}
+	NEM_logf(
+		COMP_ROUTERD,
+		"unhandled message %s/%s",
+		NEM_svcid_to_string(ca->msg->packed.service_id),
+		NEM_cmdid_to_string(
+			ca->msg->packed.service_id,
+			ca->msg->packed.command_id
+		)
+	);
 
 	if (NULL != ca->txnin) {
 		NEM_txnin_reply_err(ca->txnin, NEM_err_static("no handler"));
@@ -354,9 +333,7 @@ on_unknown_message(NEM_thunk_t *thunk, void *varg)
 static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])
 {
-	if (NEM_rootd_verbose()) {
-		printf("c-routerd: setup\n");
-	}
+	NEM_logf(COMP_ROUTERD, "setup");
 
 	NEM_svcmux_init(&svcs);
 	NEM_rootd_svc_daemon_bind(&svcs);
@@ -374,26 +351,21 @@ on_shutdown_msg(NEM_thunk_t *thunk, void *varg)
 {
 	NEM_txn_ca *ca = varg;
 	if (!NEM_err_ok(ca->err)) {
-		if (NEM_rootd_verbose()) {
-			printf(
-				"c-routerd: error sending shutdown message: %s\n",
-				NEM_err_string(ca->err)
-			);
-		}
+		NEM_logf(
+			COMP_ROUTERD,
+			"error sending shutdown message: %s",
+			NEM_err_string(ca->err)
+		);
 	}
 	else if (ca->done) {
-		if (NEM_rootd_verbose()) {
-			printf("c-routerd: client shutdown acknowledged\n");
-		}
+		NEM_logf(COMP_ROUTERD, "client shutdown acknowledged");
 	}
 }
 
 static bool
 try_shutdown(NEM_app_t *app)
 {
-	if (NEM_rootd_verbose()) {
-		printf("c-routerd: try-shutdown\n");
-	}
+	NEM_logf(COMP_ROUTERD, "try-shutdown");
 
 	want_running = false;
 
@@ -417,13 +389,9 @@ try_shutdown(NEM_app_t *app)
 static void
 teardown(NEM_app_t *app)
 {
-	if (NEM_rootd_verbose()) {
-		printf("c-routerd: teardown\n");
-	}
+	NEM_logf(COMP_ROUTERD, "teardown");
 	if (is_running) {
-		if (NEM_rootd_verbose()) {
-			printf("c-routerd: killing child\n");
-		}
+		NEM_logf(COMP_ROUTERD, "killing child");
 		// NB: Set is_running first to signal that the child shouldn't
 		// be freed by the on_child_died.
 		want_running = false;

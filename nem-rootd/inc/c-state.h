@@ -13,8 +13,3 @@
 // This also parses the command-line arguments.
 NEM_err_t NEM_rootd_state_init(int argc, char *argv[]);
 void NEM_rootd_state_close();
-
-bool NEM_rootd_verbose();
-bool NEM_rootd_capsicum();
-const char *NEM_rootd_routerd_path();
-const char *NEM_rootd_jail_root();

@@ -8,6 +8,8 @@
 #include "nem.h"
 #include "imgset.h"
 #include "utils.h"
+#include "c-log.h"
+#include "c-config.h"
 #include "c-state.h"
 #include "c-database.h"
 
@@ -137,13 +139,12 @@ load_version_status(NEM_rootd_imgv_t *imgv)
 	char hexhash[65] = {0};
 	hex_encode(hexhash, (char*) binhash, sizeof(binhash));
 	if (strcmp(hexhash, imgv->sha256)) {
-		if (NEM_rootd_verbose()) {
-			printf(
-				"c-images: bad hash:\n  wanted: %s\n  actual: %s\n",
-				imgv->sha256,
-				hexhash
-			);
-		}
+		NEM_logf(
+			COMP_IMAGES,
+			"\n  bad hash:\n  wanted: %s\n  actual: %s",
+			imgv->sha256,
+			hexhash
+		);
 
 		imgv->status = NEM_ROOTD_IMGV_BAD_HASH;
 	}
@@ -291,12 +292,11 @@ purge_extra_files()
 			}
 
 			if (NULL == NEM_rootd_imgset_imgv_by_hash(&imgset, ent->d_name)) {
-				if (NEM_rootd_verbose()) {
-					printf(
-						"c-images: purging unknown image '%s'\n",
-						ent->d_name
-					);
-				}
+				NEM_logf(
+					COMP_IMAGES,
+					"purging unknown image '%s'",
+					ent->d_name
+				);
 
 				char *file_path = NULL;
 				err = NEM_path_join(&file_path, images_path, ent->d_name);
@@ -322,9 +322,7 @@ done:
 static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])
 {
-	if (NEM_rootd_verbose()) {
-		printf("c-images: setup\n");
-	}
+	NEM_logf(COMP_IMAGES, "setup");
 
 	NEM_rootd_imgset_init(&imgset);
 
@@ -355,22 +353,21 @@ setup(NEM_app_t *app, int argc, char *argv[])
 		return err;
 	}
 
-	if (NEM_rootd_verbose()) {
-		printf("c-images: loaded %lu images\n", imgset.imgs_len);
-		for (size_t i = 0; i < imgset.imgs_len; i += 1) {
-			NEM_rootd_img_t *img = &imgset.imgs[i];
-			printf(" - %s\n", img->name);
-			for (size_t j = 0; j < img->vers_len; j += 1) {
-				int id = img->vers[j];
-				NEM_rootd_imgv_t *ver = NEM_rootd_imgset_imgv_by_id(&imgset, id);
-				printf(
-					"    %12.12s... %12s   %6db %s\n", 
-					ver->sha256,
-					ver->version,
-					ver->size,
-					NEM_rootd_imgv_status_string(ver->status)
-				);
-			}
+	NEM_logf(COMP_IMAGES, "loaded %lu images", imgset.imgs_len);
+	for (size_t i = 0; i < imgset.imgs_len; i += 1) {
+		NEM_rootd_img_t *img = &imgset.imgs[i];
+		NEM_logf(COMP_IMAGES, " - %s", img->name);
+		for (size_t j = 0; j < img->vers_len; j += 1) {
+			int id = img->vers[j];
+			NEM_rootd_imgv_t *ver = NEM_rootd_imgset_imgv_by_id(&imgset, id);
+			NEM_logf(
+				COMP_IMAGES,
+				"    %12.12s... %12s   %6db %s", 
+				ver->sha256,
+				ver->version,
+				ver->size,
+				NEM_rootd_imgv_status_string(ver->status)
+			);
 		}
 	}
 
@@ -380,9 +377,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 static bool
 try_shutdown(NEM_app_t *app)
 {
-	if (NEM_rootd_verbose()) {
-		printf("c-images: try-shutdown\n");
-	}
+	NEM_logf(COMP_IMAGES, "try-shutdown");
 
 	return true;
 }
@@ -390,9 +385,7 @@ try_shutdown(NEM_app_t *app)
 static void
 teardown(NEM_app_t *app)
 {
-	if (NEM_rootd_verbose()) {
-		printf("c-images: teardown\n");
-	}
+	NEM_logf(COMP_IMAGES, "teardown");
 
 	NEM_rootd_imgset_free(&imgset);
 

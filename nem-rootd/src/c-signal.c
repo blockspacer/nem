@@ -1,5 +1,6 @@
 #include "nem.h"
-#include "c-state.h"
+#include "c-log.h"
+#include "c-args.h"
 
 #include <signal.h>
 
@@ -37,12 +38,11 @@ on_kevent(NEM_thunk_t *thunk, void *varg)
 		return;
 	}
 
-	if (NEM_rootd_verbose()) {
-		printf(
-			"c-signal: got %s; shutting down\n",
-			sig_to_string((int)kev->ident)
-		);
-	}
+	NEM_logf(
+		COMP_SIGNAL,
+		"got %s; shutting down",
+		sig_to_string((int)kev->ident)
+	);
 
 	NEM_app_t *app = NEM_thunk_ptr(thunk);
 	NEM_app_shutdown(app);
@@ -57,9 +57,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 		SIGPIPE,
 	};
 
-	if (NEM_rootd_verbose()) {
-		printf("c-signal: startup\n");
-	}
+	NEM_logf(COMP_SIGNAL, "startup");
 
 	struct kevent kev[NEM_ARRSIZE(sigs)];
 	kevent_thunk = NEM_thunk_new_ptr(&on_kevent, app);
@@ -87,9 +85,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 static void
 teardown(NEM_app_t *app)
 {
-	if (NEM_rootd_verbose()) {
-		printf("c-signal: teardown\n");
-	}
+	NEM_logf(COMP_SIGNAL, "teardown");
 
 	if (NULL != kevent_thunk) {
 		NEM_thunk_free(kevent_thunk);

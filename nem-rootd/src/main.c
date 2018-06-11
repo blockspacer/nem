@@ -2,6 +2,8 @@
 #include "c-routerd.h"
 
 extern const NEM_app_comp_t
+	NEM_rootd_c_args,
+	NEM_rootd_c_config,
 	NEM_rootd_c_state,
 	NEM_rootd_c_lockfile,
 	NEM_rootd_c_signal,
@@ -14,6 +16,9 @@ int
 main(int argc, char *argv[])
 {
 	static const NEM_app_comp_t *comps[] = {
+		&NEM_rootd_c_args,
+		&NEM_rootd_c_config,
+
 		// Utility components.
 		&NEM_rootd_c_state,
 		&NEM_rootd_c_lockfile,

@@ -2,6 +2,8 @@
 #include <sqlite3.h>
 
 #include "nem.h"
+#include "c-log.h"
+#include "c-config.h"
 #include "c-state.h"
 #include "c-database.h"
 #include "utils.h"
@@ -139,14 +141,13 @@ NEM_rootd_db_migrate(
 			continue;
 		}
 
-		if (NEM_rootd_verbose()) {
-			printf(
-				"c-database: updating %s from %d to %d\n", 
-				component,
-				ver,
-				versions[i].version
-			);
-		}
+		NEM_logf(
+			COMP_DATABASE, 
+			"c-database: updating %s from %d to %d\n", 
+			component,
+			ver,
+			versions[i].version
+		);
 		err = versions[i].fn(database);
 		if (!NEM_err_ok(err)) {
 			goto done;

@@ -1,6 +1,6 @@
 #include "nem.h"
 #include "nemsvc.h"
-#include "c-state.h"
+#include "c-args.h"
 
 static void
 svc_daemon_info(NEM_thunk_t *thunk, void *varg)

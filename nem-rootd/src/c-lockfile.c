@@ -1,5 +1,7 @@
 #include "nem.h"
 #include "utils.h"
+#include "c-log.h"
+#include "c-config.h"
 #include "c-state.h"
 
 static int lock_fd;
@@ -9,9 +11,7 @@ static char *lock_path = NULL;
 static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])
 {
-	if (NEM_rootd_verbose()) {
-		printf("c-lockfile: setup\n");
-	}
+	NEM_logf(COMP_LOCKFILE, "setup");
 
 	NEM_err_t err = NEM_path_join(
 		&lock_path,
@@ -29,16 +29,12 @@ setup(NEM_app_t *app, int argc, char *argv[])
 
 	if (0 != flock(lock_fd, LOCK_EX|LOCK_NB)) {
 		NEM_err_t err = NEM_err_errno();
-		if (NEM_rootd_verbose()) {
-			printf("c-lockfile: unable to lock file\n");
-		}
+		NEM_logf(COMP_LOCKFILE, "unable to lock file");
 		close(lock_fd);
 		return err;
 	}
 
-	if (NEM_rootd_verbose()) {
-		printf("c-lockfile: locked '%s'\n", lock_path);
-	}
+	NEM_logf(COMP_LOCKFILE, "locked '%s'", lock_path);
 
 	return NEM_err_none;
 }
@@ -46,20 +42,17 @@ setup(NEM_app_t *app, int argc, char *argv[])
 static void
 teardown(NEM_app_t *app)
 {
-	if (NEM_rootd_verbose()) {
-		printf("c-lockfile: teardown\n");
-	}
+	NEM_logf(COMP_LOCKFILE, "teardown");
 
 	flock(lock_fd, LOCK_UN);
 	close(lock_fd);
 	if (0 != unlink(lock_path)) {
-		if (NEM_rootd_verbose()) {
-			printf(
-				"c-lockfile: unable to unlink '%s': '%s'\n",
-				lock_path,
-				NEM_err_string(NEM_err_errno())
-			);
-		}
+		NEM_logf(
+			COMP_LOCKFILE,
+			"unable to unlink '%s': '%s'",
+			lock_path,
+			NEM_err_string(NEM_err_errno())
+		);
 	}
 	free(lock_path);
 }
