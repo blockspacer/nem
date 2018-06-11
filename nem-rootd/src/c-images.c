@@ -182,9 +182,9 @@ load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
 		NEM_rootd_imgv_t tmp = {
-			.id = sqlite3_column_int(stmt, 0),
-			.size = sqlite3_column_int(stmt, 2),
-			.sha256 = strdup((const char*) sqlite3_column_text(stmt, 3)),
+			.id      = sqlite3_column_int(stmt, 0),
+			.size    = sqlite3_column_int(stmt, 2),
+			.sha256  = strdup((const char*) sqlite3_column_text(stmt, 3)),
 			.version = strdup((const char*) sqlite3_column_text(stmt, 4)),
 		};
 

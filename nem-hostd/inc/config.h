@@ -22,4 +22,5 @@ typedef struct {
 NEM_hostd_config_t;
 const NEM_marshal_map_t NEM_hostd_config_vt;
 
+const NEM_hostd_config_t *NEM_hostd_config();
 extern const NEM_app_comp_t NEM_hostd_c_config;

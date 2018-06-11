@@ -2,6 +2,7 @@
 #include "nem-marshal-macros.h"
 #include "config.h"
 #include "args.h"
+#include "fsutils.h"
 
 static NEM_hostd_config_t static_config = {0};
 
@@ -76,32 +77,9 @@ open_jail_config(NEM_hostd_config_jail_t *this, NEM_hostd_config_t *cfg)
 }
 
 static NEM_err_t
-ensure_dir(const char *path)
-{
-	struct stat st = {0};
-
-	if (0 != stat(path, &st)) {
-		if (ENOENT == errno) {
-			if (0 != mkdir(path, 0770)) {
-				return NEM_err_errno();
-			}
-
-			return NEM_err_none;
-		}
-
-		return NEM_err_errno();
-	}
-
-	if (!S_ISDIR(st.st_mode)) {
-		return NEM_err_static("ensure_dir: path is something else");
-	}
-
-	return NEM_err_none;
-}
-
-static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])
 {
+	bzero(&static_config, sizeof(static_config));
 	static_config.is_init = (1 == getpid());
 	static_config.is_root = (0 == geteuid());
 
@@ -142,7 +120,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	if (NULL == static_config.rundir) {
 		static_config.rundir = strdup("./");
 	}
-	err = ensure_dir(static_config.rundir);
+	err = NEM_ensure_dir(static_config.rundir);
 	if (!NEM_err_ok(err)) {
 		config_free(&static_config);
 		return err;
@@ -156,7 +134,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 			static_config.rundir
 		);
 	}
-	err = ensure_dir(static_config.configdir);
+	err = NEM_ensure_dir(static_config.configdir);
 	if (!NEM_err_ok(err)) {
 		config_free(&static_config);
 		return err;
