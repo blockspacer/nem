@@ -1,7 +1,6 @@
 #include "nem.h"
 #include "nemsvc.h"
 #include "c-log.h"
-#include "c-state.h"
 #include "c-args.h"
 #include "c-config.h"
 #include "svc-daemon.h"

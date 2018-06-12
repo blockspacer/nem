@@ -1,6 +1,5 @@
 #include "nem.h"
 #include "nemsvc.h"
-#include "c-state.h"
 
 static void
 svc_imghost_list_images(NEM_thunk_t *thunk, void *varg)

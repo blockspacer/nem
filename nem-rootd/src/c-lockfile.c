@@ -2,7 +2,6 @@
 #include "utils.h"
 #include "c-log.h"
 #include "c-config.h"
-#include "c-state.h"
 
 static int lock_fd;
 static const char *lock_name = "lockfile";

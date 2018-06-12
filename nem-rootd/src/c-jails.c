@@ -1,6 +1,5 @@
 #include "nem.h"
 #include "c-log.h"
-#include "c-state.h"
 
 static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])

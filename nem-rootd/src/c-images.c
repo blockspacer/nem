@@ -10,7 +10,6 @@
 #include "utils.h"
 #include "c-log.h"
 #include "c-config.h"
-#include "c-state.h"
 #include "c-database.h"
 
 static char *images_path = NULL;
