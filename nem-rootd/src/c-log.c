@@ -3,6 +3,7 @@
 #include "nem.h"
 #include "c-log.h"
 #include "c-args.h"
+#include "utils.h"
 
 static const char*
 NEM_comp_name(NEM_rootd_comp_t comp)
@@ -12,14 +13,14 @@ NEM_comp_name(NEM_rootd_comp_t comp)
 		const char      *name;
 	}
 	names[] = {
-		{ COMP_ARGS,     "c-args"     },
-		{ COMP_LOG,      "c-log"      },
-		{ COMP_LOCKFILE, "c-lockfile" },
-		{ COMP_SIGNAL,   "c-signal"   },
-		{ COMP_DATABASE, "c-database" },
-		{ COMP_ROUTERD,  "c-routerd"  },
-		{ COMP_IMAGES,   "c-images"   },
-		{ COMP_JAILS,    "c-jails"    },
+		{ COMP_ARGS,     "args"     },
+		{ COMP_LOG,      "log"      },
+		{ COMP_LOCKFILE, "lockfile" },
+		{ COMP_SIGNAL,   "signal"   },
+		{ COMP_DATABASE, "database" },
+		{ COMP_ROUTERD,  "routerd"  },
+		{ COMP_IMAGES,   "images"   },
+		{ COMP_JAILS,    "jails"    },
 	};
 
 	for (size_t i = 0; i < NEM_ARRSIZE(names); i += 1) {
@@ -45,7 +46,7 @@ NEM_logf(NEM_rootd_comp_t comp, const char *fmt, ...)
 		NEM_panicf_errno("NEM_logf:");
 	}
 
-	if (NEM_rootd_verbose()) {
+	if (NEM_rootd_verbose() && !NEM_rootd_testing) {
 		printf("%s: %s\n", NEM_comp_name(comp), entry);
 	}
 

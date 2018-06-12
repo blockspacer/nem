@@ -110,7 +110,7 @@ teardown()
 }
 
 const NEM_app_comp_t NEM_rootd_c_state = {
-	.name     = "c-state",
+	.name     = "state",
 	.setup    = &setup,
 	.teardown = &teardown,
 };

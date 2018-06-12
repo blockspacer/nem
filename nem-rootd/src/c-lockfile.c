@@ -58,7 +58,7 @@ teardown(NEM_app_t *app)
 }
 
 const NEM_app_comp_t NEM_rootd_c_lockfile = {
-	.name     = "c-lockfile",
+	.name     = "lockfile",
 	.setup    = &setup,
 	.teardown = &teardown,
 };

@@ -34,7 +34,7 @@ on_kevent(NEM_thunk_t *thunk, void *varg)
 	struct kevent *kev = varg;
 
 	if (kev->ident == SIGPIPE) {
-		printf("c-signal: got SIGPIPE?\n");
+		printf("signal: got SIGPIPE?\n");
 		return;
 	}
 
@@ -93,7 +93,7 @@ teardown(NEM_app_t *app)
 }
 
 const NEM_app_comp_t NEM_rootd_c_signal = {
-	.name     = "c-signal",
+	.name     = "signal",
 	.setup    = &setup,
 	.teardown = &teardown,
 };

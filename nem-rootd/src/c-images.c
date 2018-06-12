@@ -395,7 +395,7 @@ teardown(NEM_app_t *app)
 }
 
 const NEM_app_comp_t NEM_rootd_c_images = {
-	.name         = "c-images",
+	.name         = "images",
 	.setup        = &setup,
 	.try_shutdown = &try_shutdown,
 	.teardown     = &teardown,

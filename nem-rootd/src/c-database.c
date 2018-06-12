@@ -143,7 +143,7 @@ NEM_rootd_db_migrate(
 
 		NEM_logf(
 			COMP_DATABASE, 
-			"c-database: updating %s from %d to %d\n", 
+			"updating %s from %d to %d\n", 
 			component,
 			ver,
 			versions[i].version
@@ -181,7 +181,7 @@ done:
 }
 
 const NEM_app_comp_t NEM_rootd_c_database = {
-	.name     = "c-database",
+	.name     = "database",
 	.setup    = &setup,
 	.teardown = &teardown,
 };

@@ -98,7 +98,7 @@ routerd_enter(NEM_thunk1_t *thunk, void *varg)
 		return;
 	}
 
-	if (!NEM_rootd_capsicum()) {
+	if (true /*!NEM_rootd_capsicum()*/) {
 		return;
 	}
 
@@ -403,7 +403,7 @@ teardown(NEM_app_t *app)
 }
 
 const NEM_app_comp_t NEM_rootd_c_routerd = {
-	.name         = "c-routerd",
+	.name         = "routerd",
 	.setup        = &setup,
 	.try_shutdown = &try_shutdown,
 	.teardown     = &teardown,

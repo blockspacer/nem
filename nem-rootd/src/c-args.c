@@ -5,11 +5,11 @@
 
 #include "nem.h"
 #include "c-args.h"
+#include "utils.h"
 
 static bool is_init = false;
 static bool is_root = false;
 static int verbose = 0;
-static int capsicum = 0;
 static int reload = 0;
 static char *rootd_path = NULL;
 static char *config_path = NULL;
@@ -29,14 +29,16 @@ static struct option longopts[] = {
 static void
 usage()
 {
-	fprintf(
-		stderr,
-		"Usage: %s\n"
-		"  --verbose, -v:    be noisy\n"
-		"  --reload:         internal usage\n"
-		"  --config=path:    path to config.yaml\n",
-		rootd_path
-	);
+	if (!NEM_rootd_testing) {
+		fprintf(
+			stderr,
+			"Usage: %s\n"
+			"  --verbose, -v:    be noisy\n"
+			"  --reload:         internal usage\n"
+			"  --config=path:    path to config.yaml\n",
+			rootd_path
+		);
+	}
 }
 
 static char*
@@ -75,7 +77,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 				break;
 			default:
 				usage();
-				return NEM_err_static("c-args: invalid option");
+				return NEM_err_static("args: invalid option");
 		}
 		switch (idx) {
 			case OPT_VERBOSE:
@@ -97,20 +99,6 @@ setup(NEM_app_t *app, int argc, char *argv[])
 		config_path = strdup("./config.yaml");
 	}
 
-	if (verbose) {
-		printf(
-			"nem-rootd starting\n"
-			"   pid         = %d\n"
-			"   reload      = %d\n"
-			"   rootd-path  = %s\n"
-			"   config-path = %s\n",
-			getpid(),
-			reload,
-			rootd_path,
-			config_path
-		);
-	}
-
 	return NEM_err_none;
 }
 
@@ -122,7 +110,7 @@ teardown()
 }
 
 const NEM_app_comp_t NEM_rootd_c_args = {
-	.name     = "c-state",
+	.name     = "args",
 	.setup    = &setup,
 	.teardown = &teardown,
 };
@@ -133,10 +121,16 @@ NEM_rootd_verbose()
 	return verbose;
 }
 
-bool
-NEM_rootd_capsicum()
+const char*
+NEM_rootd_config_path()
 {
-	return capsicum;
+	return config_path;
+}
+
+const char*
+NEM_rootd_own_path()
+{
+	return rootd_path;
 }
 
 const char*

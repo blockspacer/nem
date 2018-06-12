@@ -3,6 +3,8 @@
 
 #include "utils.h"
 
+bool NEM_rootd_testing = false;
+
 NEM_err_t
 NEM_path_join(char **out, const char *base, const char *rest)
 {
@@ -39,4 +41,28 @@ NEM_err_sqlite(sqlite3 *db)
 	}
 	msg = strdup(sqlite3_errmsg(db));
 	return NEM_err_static(msg);
+}
+
+NEM_err_t
+NEM_ensure_dir(const char *path)
+{
+	struct stat st = {0};
+
+	if (0 != stat(path, &st)) {
+		if (ENOENT == errno) {
+			if (0 != mkdir(path, 0770)) {
+				return NEM_err_errno();
+			}
+
+			return NEM_err_none;
+		}
+
+		return NEM_err_errno();
+	}
+
+	if (!S_ISDIR(st.st_mode)) {
+		return NEM_err_static("NEM_ensure_dir: path is something else");
+	}
+
+	return NEM_err_none;
 }

@@ -23,7 +23,7 @@ teardown(NEM_app_t *app)
 }
 
 const NEM_app_comp_t NEM_rootd_c_jails = {
-	.name         = "c-jails",
+	.name         = "jails",
 	.setup        = &setup,
 	.try_shutdown = &try_shutdown,
 	.teardown     = &teardown,
