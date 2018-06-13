@@ -80,7 +80,7 @@ NEM_cmdid_to_string(uint16_t svcid, uint16_t cmdid)
 	for (size_t i = 0; i < NEM_ARRSIZE(svc_id_map); i += 1) {
 		if (svc_id_map[i].svcid == svcid) {
 			const cmd_data_t *cmds = svc_id_map[i].commands;
-			for (size_t j = 0; j < svc_id_map[i].num_commands; i += 1) {
+			for (size_t j = 0; j < svc_id_map[i].num_commands; j += 1) {
 				if (cmds[j].cmdid == cmdid) {
 					return cmds[j].name;
 				}
