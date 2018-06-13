@@ -83,14 +83,17 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	static_config.is_init = (1 == getpid());
 	static_config.is_root = (0 == geteuid());
 
-	const char *config_path = NEM_rootd_config_path();
-	if (NULL == config_path) {
-		// Default this to config.yaml in the current directory.
-		config_path = "config.yaml";
+	char *config_path = strdup(NEM_rootd_config_path());
+	NEM_err_t err = NEM_path_abs(&config_path);
+	if (!NEM_err_ok(err)) {
+		NEM_panicf_errno(
+			"error: unable to resolve path %s",
+			NEM_rootd_config_path()
+		);
 	}
 
 	NEM_file_t file;
-	NEM_err_t err = NEM_file_init(&file, config_path);
+	err = NEM_file_init(&file, config_path);
 	if (!NEM_err_ok(err)) {
 		NEM_panicf(
 			"error: unable to find config at %s: %s",
@@ -98,6 +101,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 			NEM_err_string(err)
 		);
 	}
+	free(config_path);
 	if (0 == NEM_file_len(&file)) {
 		NEM_file_free(&file);
 		return NEM_err_static("config file is empty");
@@ -162,3 +166,24 @@ const NEM_app_comp_t NEM_rootd_c_config = {
 	.setup    = &setup,
 	.teardown = &teardown,
 };
+
+const char*
+NEM_rootd_run_root()
+{
+	NEM_panic_if_null((void*)static_config.rundir);
+	return static_config.rundir;
+}
+
+const char*
+NEM_rootd_config_root()
+{
+	NEM_panic_if_null((void*)static_config.configdir);
+	return static_config.configdir;
+}
+
+const char*
+NEM_rootd_routerd_path()
+{
+	// XXX
+	return "/home/lye/code/go/src/nem.rocks/routerd/routerd";
+}

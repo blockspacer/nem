@@ -15,7 +15,7 @@
 static char *images_path = NULL;
 static char *persisted_path = NULL;
 static char *shared_mounts_path = NULL;
-static NEM_rootd_imgset_t imgset;
+static NEM_imgset_t static_imgset;
 
 static NEM_err_t
 make_directories(const char *base)
@@ -57,18 +57,18 @@ images_db_migration_1(sqlite3 *db)
 		"  image_name TEXT NOT NULL"
 		"); "
 		"CREATE TABLE image_versions ("
-		"  imgv_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
-		"  imgv_created DATETIME NOT NULL,"
-		"  imgv_size INTEGER NOT NULL,"
-		"  imgv_sha256 TEXT NOT NULL,"
-		"  imgv_version TEXT NOT NULL"
+		"  imgver_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,"
+		"  imgver_created DATETIME NOT NULL,"
+		"  imgver_size INTEGER NOT NULL,"
+		"  imgver_sha256 TEXT NOT NULL,"
+		"  imgver_version TEXT NOT NULL"
 		"); "
 		"CREATE TABLE image_rels ("
-		"  imgv_id INTEGER NOT NULL REFERENCES image_versions(imgv_id),"
+		"  imgver_id INTEGER NOT NULL REFERENCES image_versions(imgver_id),"
 		"  image_id INTEGER NOT NULL REFERENCES images(image_id)"
 		"); "
 		"CREATE UNIQUE INDEX idx_images_version_sha256"
-		" ON image_versions(imgv_sha256);",
+		" ON image_versions(imgver_sha256);",
 		NULL,
 		NULL,
 		NULL
@@ -100,7 +100,7 @@ hex_encode(char *out, const char *in, size_t in_len)
 }
 
 static NEM_err_t
-load_version_status(NEM_rootd_imgv_t *imgv)
+load_version_status(NEM_imgver_t *imgv)
 {
 	NEM_err_t err = NEM_err_none;
 	char *path;
@@ -152,7 +152,7 @@ load_version_status(NEM_rootd_imgv_t *imgv)
 }
 
 static NEM_err_t
-load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
+load_image_versions(sqlite3 *db, NEM_img_t *img)
 {
 	NEM_err_t err = NEM_err_none;
 	sqlite3_stmt *stmt = NULL;
@@ -160,12 +160,12 @@ load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 	int code = sqlite3_prepare_v2(
 		db,
 		"SELECT "
-		"  v.imgv_id, v.imgv_created, v.imgv_size,"
-		"  v.imgv_sha256, v.imgv_version "
+		"  v.imgver_id, v.imgver_created, v.imgver_size,"
+		"  v.imgver_sha256, v.imgver_version "
 		"FROM image_versions v "
-		"JOIN image_rels r ON v.imgv_id = r.imgv_id "
+		"JOIN image_rels r ON v.imgver_id = r.imgver_id "
 		"WHERE r.image_id = ?1"
-		"ORDER BY v.imgv_id ASC",
+		"ORDER BY v.imgver_id ASC",
 		-1,
 		&stmt,
 		NULL
@@ -181,7 +181,7 @@ load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 	}
 
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
-		NEM_rootd_imgv_t tmp = {
+		NEM_imgver_t tmp = {
 			.id      = sqlite3_column_int(stmt, 0),
 			.size    = sqlite3_column_int(stmt, 2),
 			.sha256  = strdup((const char*) sqlite3_column_text(stmt, 3)),
@@ -191,8 +191,8 @@ load_image_versions(sqlite3 *db, NEM_rootd_img_t *img)
 		const char *created_str = (const char*) sqlite3_column_text(stmt, 1);
 		strptime(created_str, "%F %T", &tmp.created);
 
-		NEM_rootd_imgv_t *ver = &tmp;
-		err = NEM_rootd_imgset_add_ver(&imgset, &ver, img);
+		NEM_imgver_t *ver = &tmp;
+		err = NEM_imgset_add_ver(&static_imgset, &ver, img);
 		if (!NEM_err_ok(err)) {
 			goto done;
 		}
@@ -233,13 +233,13 @@ load_images()
 	}
 
 	while (SQLITE_ROW == sqlite3_step(stmt)) {
-		NEM_rootd_img_t tmp = {
+		NEM_img_t tmp = {
 			.id = sqlite3_column_int(stmt, 0),
 			.name = strdup((const char*) sqlite3_column_text(stmt, 1)),
 		};
-		NEM_rootd_img_t *img = &tmp;
+		NEM_img_t *img = &tmp;
 
-		err = NEM_rootd_imgset_add_img(&imgset, &img);
+		err = NEM_imgset_add_img(&static_imgset, &img);
 		if (!NEM_err_ok(err)) {
 			goto done;
 		}
@@ -290,7 +290,7 @@ purge_extra_files()
 				continue;
 			}
 
-			if (NULL == NEM_rootd_imgset_imgv_by_hash(&imgset, ent->d_name)) {
+			if (NULL == NEM_imgset_imgver_by_hash(&static_imgset, ent->d_name)) {
 				NEM_logf(
 					COMP_IMAGES,
 					"purging unknown image '%s'",
@@ -323,10 +323,10 @@ setup(NEM_app_t *app, int argc, char *argv[])
 {
 	NEM_logf(COMP_IMAGES, "setup");
 
-	NEM_rootd_imgset_init(&imgset);
+	NEM_imgset_init(&static_imgset);
 
 	NEM_err_t err;
-	const char *base = NEM_rootd_jail_root();
+	const char *base = NEM_rootd_run_root();
 
 	err = make_directories(base);
 	if (!NEM_err_ok(err)) {
@@ -352,20 +352,20 @@ setup(NEM_app_t *app, int argc, char *argv[])
 		return err;
 	}
 
-	NEM_logf(COMP_IMAGES, "loaded %lu images", imgset.imgs_len);
-	for (size_t i = 0; i < imgset.imgs_len; i += 1) {
-		NEM_rootd_img_t *img = &imgset.imgs[i];
+	NEM_logf(COMP_IMAGES, "loaded %lu images", static_imgset.imgs_len);
+	for (size_t i = 0; i < static_imgset.imgs_len; i += 1) {
+		NEM_img_t *img = &static_imgset.imgs[i];
 		NEM_logf(COMP_IMAGES, " - %s", img->name);
 		for (size_t j = 0; j < img->vers_len; j += 1) {
 			int id = img->vers[j];
-			NEM_rootd_imgv_t *ver = NEM_rootd_imgset_imgv_by_id(&imgset, id);
+			NEM_imgver_t *ver = NEM_imgset_imgver_by_id(&static_imgset, id);
 			NEM_logf(
 				COMP_IMAGES,
 				"    %12.12s... %12s   %6db %s", 
 				ver->sha256,
 				ver->version,
 				ver->size,
-				NEM_rootd_imgv_status_string(ver->status)
+				NEM_imgver_status_string(ver->status)
 			);
 		}
 	}
@@ -386,7 +386,7 @@ teardown(NEM_app_t *app)
 {
 	NEM_logf(COMP_IMAGES, "teardown");
 
-	NEM_rootd_imgset_free(&imgset);
+	NEM_imgset_free(&static_imgset);
 
 	free(images_path);
 	free(persisted_path);

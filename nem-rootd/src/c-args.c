@@ -72,7 +72,9 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	while (-1 != (ch = getopt_long(argc, argv, "vr0", longopts, &idx))) {
 		switch (ch) {
 			case 'v':
+				break;
 			case 'c':
+				break;
 			case 0: 
 				break;
 			default:
@@ -131,17 +133,5 @@ const char*
 NEM_rootd_own_path()
 {
 	return rootd_path;
-}
-
-const char*
-NEM_rootd_routerd_path()
-{
-	return NULL;
-}
-
-const char*
-NEM_rootd_jail_root()
-{
-	return NULL;
 }
 

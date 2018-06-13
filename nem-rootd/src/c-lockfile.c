@@ -14,7 +14,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 
 	NEM_err_t err = NEM_path_join(
 		&lock_path,
-		NEM_rootd_jail_root(),
+		NEM_rootd_run_root(),
 		lock_name
 	);
 	if (!NEM_err_ok(err)) {
