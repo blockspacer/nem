@@ -70,13 +70,13 @@ NEM_jailimg_type_t NEM_jailimg_type(const NEM_jailimg_t *);
 
 // NEM_jaildesc_t is a jail description.
 typedef struct {
-	const char          *jail_id;
-	bool                 want_running;
-	const char         **isolation_flags;
-	size_t               isolation_flags_len;
-	const char          *exe_path;
+	const char    *jail_id;
+	bool           want_running;
+	const char   **isolation_flags;
+	size_t         isolation_flags_len;
+	const char    *exe_path;
 	NEM_jailimg_t *images;
-	size_t               images_len;
+	size_t         images_len;
 }
 NEM_jaildesc_t;
 const NEM_marshal_map_t NEM_jaildesc_m;
@@ -85,8 +85,5 @@ bool NEM_jaildesc_valid(const NEM_jaildesc_t *);
 
 // NEM_jaildesc_use_isolate returns true if the given isolation flag
 // is set in the jail description. These panic if the jaildesc is not valid.
-bool NEM_jaildesc_use_isolate(
-	const NEM_jaildesc_t*,
-	NEM_jailimg_isolate_t
-);
+bool NEM_jaildesc_use_isolate(const NEM_jaildesc_t*, NEM_jailimg_isolate_t);
 int NEM_jaildesc_isolate(const NEM_jaildesc_t *);

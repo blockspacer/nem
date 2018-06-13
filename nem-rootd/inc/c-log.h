@@ -8,6 +8,7 @@ typedef enum {
 	COMP_DATABASE,
 	COMP_ROUTERD,
 	COMP_IMAGES,
+	COMP_MOUNTS,
 	COMP_JAILS,
 }
 NEM_rootd_comp_t;

@@ -20,6 +20,7 @@ NEM_comp_name(NEM_rootd_comp_t comp)
 		{ COMP_DATABASE, "database" },
 		{ COMP_ROUTERD,  "routerd"  },
 		{ COMP_IMAGES,   "images"   },
+		{ COMP_MOUNTS,   "mounts"   },
 		{ COMP_JAILS,    "jails"    },
 	};
 
