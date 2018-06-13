@@ -21,6 +21,7 @@ NEM_comp_name(NEM_rootd_comp_t comp)
 		{ COMP_ROUTERD,  "routerd"  },
 		{ COMP_IMAGES,   "images"   },
 		{ COMP_MOUNTS,   "mounts"   },
+		{ COMP_MD,       "md"       },
 		{ COMP_JAILS,    "jails"    },
 	};
 

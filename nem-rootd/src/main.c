@@ -9,6 +9,7 @@ extern const NEM_app_comp_t
 	NEM_rootd_c_database,
 	NEM_rootd_c_routerd,
 	NEM_rootd_c_images,
+	NEM_rootd_c_md,
 	NEM_rootd_c_mounts,
 	NEM_rootd_c_jails;
 
@@ -24,6 +25,7 @@ main(int argc, char *argv[])
 		&NEM_rootd_c_database,
 
 		&NEM_rootd_c_images,
+		&NEM_rootd_c_md,
 		&NEM_rootd_c_mounts,
 		&NEM_rootd_c_jails,
 	};
