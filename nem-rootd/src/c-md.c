@@ -21,9 +21,9 @@ typedef struct {
 	// NB: ordering isn't important here; these are individually
 	// refcounted and can't actually be released until they are no more
 	// consumers referencing them.
-	NEM_md_t *mds;
-	size_t    mds_len;
-	size_t    mds_cap;
+	NEM_md_t **mds;
+	size_t     mds_len;
+	size_t     mds_cap;
 }
 NEM_mdlist_t;
 
@@ -64,19 +64,28 @@ geom_config_int(const struct gconf *cfg, const char *key)
 	return (int)val;
 }
 
+static NEM_md_t*
+NEM_md_alloc(int unit)
+{
+	NEM_md_t *this = NEM_malloc(sizeof(NEM_md_t));
+	this->unit = unit;
+	return this;
+}
+
 static void
 NEM_md_free(NEM_md_t *this)
 {
 	free(this->source);
 	free(this->dest);
+	free(this);
 }
 
 static NEM_md_t*
 NEM_mdlist_by_unit(NEM_mdlist_t *this, int unit)
 {
 	for (size_t i = 0; i < this->mds_len; i += 1) {
-		if (this->mds[i].unit == unit) {
-			return &this->mds[i];
+		if (this->mds[i]->unit == unit) {
+			return this->mds[i];
 		}
 	}
 	return NULL;
@@ -87,8 +96,8 @@ NEM_mdlist_by_dest(NEM_mdlist_t *this, const char *dest)
 {
 	// XXX: realpath(dest)? from geom it's always correct and immutable.
 	for (size_t i = 0; i < this->mds_len; i += 1) {
-		if (NULL != this->mds[i].dest && !strcmp(this->mds[i].dest, dest)) {
-			return &this->mds[i];
+		if (NULL != this->mds[i]->dest && !strcmp(this->mds[i]->dest, dest)) {
+			return this->mds[i];
 		}
 	}
 	return NULL;
@@ -102,37 +111,34 @@ NEM_mdlist_add_unit(NEM_mdlist_t *this, int unit)
 	}
 
 	if (this->mds_len == this->mds_cap) {
-		this->mds_cap *= 2;
+		this->mds_cap = (this->mds_cap == 0) ? 1 : this->mds_cap * 2;
 		this->mds = NEM_panic_if_null(realloc(
 			this->mds,
-			sizeof(NEM_mdlist_t) * this->mds_cap
+			sizeof(NEM_md_t*) * this->mds_cap
 		));
 	}
 
-	NEM_md_t *md = &this->mds[this->mds_len];
-	bzero(md, sizeof(*md));
+	NEM_md_t *md = NEM_md_alloc(unit);
+	this->mds[this->mds_len] = md;
 	this->mds_len += 1;
-	md->unit = unit;
 	return md;
 }
 
 static void
 NEM_mdlist_remove_md(NEM_mdlist_t *this, NEM_md_t *md)
 {
-	if (
-		0 == this->mds_len
-		|| md < this->mds
-		|| md > this->mds + this->mds_len
-	) {
-		NEM_panicf("NEM_mdlist_remove_md: removal oob");
+	size_t idx;
+	for (size_t i = 0; i < this->mds_len; i += 1) {
+		if (md == this->mds[i]) {
+			idx = i;
+			goto remove;
+		}
 	}
-
-	off_t diff = md - this->mds;
-	size_t idx = diff / sizeof(*md);
+	NEM_panicf("NEM_mdlist_remove_md: removal oob");
+remove:
 	this->mds_len -= 1;
 	if (idx < this->mds_len) {
-		*md = this->mds[this->mds_len];
-		bzero(&this->mds[this->mds_len], sizeof(*md));
+		this->mds[idx] = this->mds[this->mds_len];
 	}
 }
 
@@ -140,7 +146,7 @@ static void
 NEM_mdlist_clear(NEM_mdlist_t *this)
 {
 	for (size_t i = 0; i < this->mds_len; i += 1) {
-		NEM_md_free(&this->mds[i]);
+		NEM_md_free(this->mds[i]);
 	}
 
 	free(this->mds);
@@ -222,7 +228,7 @@ static NEM_err_t
 NEM_mdlist_rescan(NEM_mdlist_t *this)
 {
 	for (size_t i = 0; i < this->mds_len; i +=1 ) {
-		this->mds[i].seen = false;
+		this->mds[i]->seen = false;
 	}
 
 	struct gmesh tree;
@@ -254,9 +260,10 @@ NEM_mdlist_rescan(NEM_mdlist_t *this)
 	}
 
 	for (size_t i = 0; i < this->mds_len;) {
-		NEM_md_t *md = &this->mds[i];
+		NEM_md_t *md = this->mds[i];
 		if (!md->seen) {
 			NEM_mdlist_remove_md(this, md);
+			NEM_md_free(md);
 		}
 		else {
 			i += 1;
@@ -283,7 +290,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	}
 
 	for (size_t i = 0; i < static_mdlist.mds_len; i += 1) {
-		NEM_md_t *md = &static_mdlist.mds[i];
+		NEM_md_t *md = static_mdlist.mds[i];
 		NEM_logf(
 			COMP_MD,
 			"  md%d: (%s, %s) %s -> %s",
