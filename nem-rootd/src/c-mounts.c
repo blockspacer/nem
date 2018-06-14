@@ -1,7 +1,7 @@
 #include "nem.h"
 #include "c-mounts.h"
 #include "c-log.h"
-#include "c-md.h"
+#include "c-disk-md.h"
 
 typedef enum {
 	NEM_MOUNT_MDRO,
@@ -15,7 +15,7 @@ struct NEM_mount_t {
 	LIST_ENTRY(NEM_mount_t) link;
 
 	NEM_mount_type_t type;
-	NEM_md_t        *md; // NB: non-NULL for MD mounts.
+	NEM_disk_md_t   *md; // NB: non-NULL for MD mounts.
 	char            *source;
 	char            *dest;
 	bool             owned;

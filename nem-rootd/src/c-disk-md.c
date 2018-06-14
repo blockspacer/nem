@@ -3,12 +3,17 @@
 #include <limits.h>
 
 #include "nem.h"
-#include "c-md.h"
+#include "c-disk-md.h"
 #include "c-log.h"
 
-struct NEM_md_t {
+typedef struct NEM_mdlist_t NEM_mdlist_t;;
+
+struct NEM_disk_md_t {
+	NEM_mdlist_t *list;
+
 	int   unit;
 	int   refcount;
+	char *device;
 	char *source; // NB: May be NULL (mem).
 	char *dest;   // NB: May be NULL (unmounted).
 	bool  owned;
@@ -17,15 +22,14 @@ struct NEM_md_t {
 	bool  seen; // NB: used for mark/sweep purposes.
 };
 
-typedef struct {
+struct NEM_mdlist_t {
 	// NB: ordering isn't important here; these are individually
 	// refcounted and can't actually be released until they are no more
 	// consumers referencing them.
-	NEM_md_t **mds;
-	size_t     mds_len;
-	size_t     mds_cap;
-}
-NEM_mdlist_t;
+	NEM_disk_md_t **mds;
+	size_t          mds_len;
+	size_t          mds_cap;
+};
 
 static const char*
 geom_config_str(const struct gconf *cfg, const char *key)
@@ -64,23 +68,52 @@ geom_config_int(const struct gconf *cfg, const char *key)
 	return (int)val;
 }
 
-static NEM_md_t*
+static NEM_disk_md_t*
 NEM_md_alloc(int unit)
 {
-	NEM_md_t *this = NEM_malloc(sizeof(NEM_md_t));
+	NEM_disk_md_t *this = NEM_malloc(sizeof(NEM_disk_md_t));
 	this->unit = unit;
+	asprintf(&this->device, "md%d", unit);
 	return this;
 }
 
 static void
-NEM_md_free(NEM_md_t *this)
+NEM_md_free_internal(NEM_disk_md_t *this)
 {
 	free(this->source);
 	free(this->dest);
 	free(this);
 }
 
-static NEM_md_t*
+static void NEM_mdlist_remove_md(NEM_mdlist_t *list, NEM_disk_md_t *md);
+
+void
+NEM_disk_md_free(NEM_disk_md_t *this)
+{
+	if (0 == this->refcount) {
+		NEM_panic("NEM_md_free: corrupt refcount");
+	}
+
+	this->refcount -= 1;
+	if (0 == this->refcount) {
+		NEM_mdlist_remove_md(this->list, this);
+		NEM_md_free_internal(this);
+	}
+}
+
+int
+NEM_disk_md_unit(NEM_disk_md_t *this)
+{
+	return this->unit;
+}
+
+const char*
+NEM_disk_md_device(NEM_disk_md_t *this)
+{
+	return this->device;
+}
+
+static NEM_disk_md_t*
 NEM_mdlist_by_unit(NEM_mdlist_t *this, int unit)
 {
 	for (size_t i = 0; i < this->mds_len; i += 1) {
@@ -91,7 +124,7 @@ NEM_mdlist_by_unit(NEM_mdlist_t *this, int unit)
 	return NULL;
 }
 
-static NEM_md_t*
+static NEM_disk_md_t*
 NEM_mdlist_by_dest(NEM_mdlist_t *this, const char *dest)
 {
 	// XXX: realpath(dest)? from geom it's always correct and immutable.
@@ -103,7 +136,7 @@ NEM_mdlist_by_dest(NEM_mdlist_t *this, const char *dest)
 	return NULL;
 }
 
-static NEM_md_t*
+static NEM_disk_md_t*
 NEM_mdlist_add_unit(NEM_mdlist_t *this, int unit)
 {
 	if (NULL != NEM_mdlist_by_unit(this, unit)) {
@@ -114,18 +147,19 @@ NEM_mdlist_add_unit(NEM_mdlist_t *this, int unit)
 		this->mds_cap = (this->mds_cap == 0) ? 1 : this->mds_cap * 2;
 		this->mds = NEM_panic_if_null(realloc(
 			this->mds,
-			sizeof(NEM_md_t*) * this->mds_cap
+			sizeof(NEM_disk_md_t*) * this->mds_cap
 		));
 	}
 
-	NEM_md_t *md = NEM_md_alloc(unit);
+	NEM_disk_md_t *md = NEM_md_alloc(unit);
+	md->list = this;
 	this->mds[this->mds_len] = md;
 	this->mds_len += 1;
 	return md;
 }
 
 static void
-NEM_mdlist_remove_md(NEM_mdlist_t *this, NEM_md_t *md)
+NEM_mdlist_remove_md(NEM_mdlist_t *this, NEM_disk_md_t *md)
 {
 	size_t idx;
 	for (size_t i = 0; i < this->mds_len; i += 1) {
@@ -146,7 +180,7 @@ static void
 NEM_mdlist_clear(NEM_mdlist_t *this)
 {
 	for (size_t i = 0; i < this->mds_len; i += 1) {
-		NEM_md_free(this->mds[i]);
+		NEM_md_free_internal(this->mds[i]);
 	}
 
 	free(this->mds);
@@ -194,7 +228,7 @@ NEM_mdlist_add_provider(NEM_mdlist_t *this, const struct gprovider *prov)
 		mounted = true;
 	}
 
-	NEM_md_t *md = NEM_mdlist_by_unit(this, unit);
+	NEM_disk_md_t *md = NEM_mdlist_by_unit(this, unit);
 	if (NULL != md) {
 		if (
 			(NULL == file && strcmp(file, md->source))
@@ -260,10 +294,10 @@ NEM_mdlist_rescan(NEM_mdlist_t *this)
 	}
 
 	for (size_t i = 0; i < this->mds_len;) {
-		NEM_md_t *md = this->mds[i];
+		NEM_disk_md_t *md = this->mds[i];
 		if (!md->seen) {
 			NEM_mdlist_remove_md(this, md);
-			NEM_md_free(md);
+			NEM_md_free_internal(md);
 		}
 		else {
 			i += 1;
@@ -290,7 +324,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	}
 
 	for (size_t i = 0; i < static_mdlist.mds_len; i += 1) {
-		NEM_md_t *md = static_mdlist.mds[i];
+		NEM_disk_md_t *md = static_mdlist.mds[i];
 		NEM_logf(
 			COMP_MD,
 			"  md%d: (%s, %s) %s -> %s",
@@ -313,7 +347,7 @@ teardown(NEM_app_t *app)
 	NEM_logf(COMP_MD, "teardown");
 }
 
-const NEM_app_comp_t NEM_rootd_c_md = {
+const NEM_app_comp_t NEM_rootd_c_disk_md = {
 	.name     = "md",
 	.setup    = &setup,
 	.teardown = &teardown,
