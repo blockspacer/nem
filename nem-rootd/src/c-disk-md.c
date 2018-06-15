@@ -1,25 +1,30 @@
 #include <sys/types.h>
+#include <sys/mdioctl.h>
+#include <sys/ioctl.h>
 #include <libgeom.h>
 #include <limits.h>
 
 #include "nem.h"
 #include "c-disk-md.h"
 #include "c-log.h"
+#include "c-config.h"
+#include "utils.h"
 
 typedef struct NEM_mdlist_t NEM_mdlist_t;;
 
 struct NEM_disk_md_t {
 	NEM_mdlist_t *list;
 
-	int   unit;
-	int   refcount;
-	char *device;
-	char *source; // NB: May be NULL (mem).
-	char *dest;   // NB: May be NULL (unmounted).
-	bool  owned;
-	bool  writable;
-	bool  mounted;
-	bool  seen; // NB: used for mark/sweep purposes.
+	int    unit;
+	int    refcount;
+	size_t len;
+	char  *device;
+	char  *source; // NB: May be NULL (mem).
+	char  *dest;   // NB: May be NULL (unmounted).
+	bool   owned;
+	bool   writable;
+	bool   mounted;
+	bool   seen; // NB: used for mark/sweep purposes.
 };
 
 struct NEM_mdlist_t {
@@ -80,6 +85,7 @@ NEM_md_alloc(int unit)
 static void
 NEM_md_free_internal(NEM_disk_md_t *this)
 {
+	free(this->device);
 	free(this->source);
 	free(this->dest);
 	free(this);
@@ -194,6 +200,7 @@ NEM_mdlist_add_provider(NEM_mdlist_t *this, const struct gprovider *prov)
 	const char *access = geom_config_str(&prov->lg_config, "access");
 	const char *file = geom_config_str(&prov->lg_config, "file");
 	int unit = geom_config_int(&prov->lg_config, "unit");
+	long len = geom_config_long(&prov->lg_config, "length");
 	//size_t len = geom_config_long(&prov->lg_config, "length");
 	bool rw = !strcmp(access, "read-write");
 	bool mounted = false;
@@ -255,6 +262,7 @@ NEM_mdlist_add_provider(NEM_mdlist_t *this, const struct gprovider *prov)
 	md->writable = rw;
 	md->mounted = mounted;
 	md->seen = true;
+	md->len = len;
 	return NEM_err_none;
 }
 
@@ -309,6 +317,135 @@ NEM_mdlist_rescan(NEM_mdlist_t *this)
 }
 
 static NEM_mdlist_t static_mdlist = {0};
+
+static NEM_err_t
+NEM_disk_md_new(NEM_disk_md_t **pout, struct md_ioctl *params)
+{
+	NEM_mdlist_t *this = &static_mdlist;
+
+	int ctlfd = open("/dev/" MDCTL_NAME, O_RDWR|O_CLOEXEC);
+	if (0 > ctlfd) {
+		return NEM_err_errno();
+	}
+
+	int ioret = ioctl(ctlfd, MDIOCATTACH, params);
+	close(ctlfd);
+	if (-1 == ioret) {
+		return NEM_err_errno();
+	}
+
+	NEM_disk_md_t *out = NEM_mdlist_add_unit(this, params->md_unit);
+	out->refcount = 1;
+	out->len = params->md_mediasize;
+	out->owned = true;
+	*pout = out;
+	return NEM_err_none;
+}
+
+NEM_err_t
+NEM_disk_md_new_mem(NEM_disk_md_t **out, size_t len)
+{
+	NEM_mdlist_t *this = &static_mdlist;
+	*out = NULL;
+
+	for (size_t i = 0; i < this->mds_len; i += 1) {
+		NEM_disk_md_t *md = this->mds[i];
+		if (
+			0 != md->refcount
+			|| md->mounted
+			|| NULL != md->source
+			|| !md->writable
+		) {
+			continue;
+		}
+
+		if (md->len == len) {
+			md->refcount += 1;
+			*out = md;
+			return NEM_err_none;
+		}
+	}
+
+	if (!NEM_rootd_is_root()) {
+		return NEM_err_static("NEM_disk_md_new_mem: need root");
+	}
+
+	struct md_ioctl md = {
+		.md_version   = MDIOVERSION,
+		.md_type      = MD_MALLOC,
+		.md_mediasize = len,
+		.md_options   = MD_CLUSTER | MD_AUTOUNIT,
+	};
+
+	NEM_err_t err = NEM_disk_md_new(out, &md);
+	if (NEM_err_ok(err)) {
+		(*out)->writable = true;
+	}
+
+	return err;
+}
+
+NEM_err_t
+NEM_disk_md_new_file(NEM_disk_md_t **out, const char *path, bool ro)
+{
+	NEM_mdlist_t *this = &static_mdlist;
+	*out = NULL;
+
+	char *tmp_path = strdup(path);
+	NEM_err_t err = NEM_path_abs(&tmp_path);
+	if (!NEM_err_ok(err)) {
+		free(tmp_path);
+		return err;
+	}
+
+	for (size_t i = 0; i < this->mds_len; i += 1) {
+		NEM_disk_md_t *md = this->mds[i];
+		if (
+			0 != md->refcount
+			|| md->mounted
+			|| NULL == md->source
+			|| ro == md->writable
+		) {
+			continue;
+		}
+
+		if (0 == strcmp(md->source, path)) {
+			md->refcount += 1;
+			*out = md;
+			return NEM_err_none;
+		}
+	}
+
+	if (!NEM_rootd_is_root()) {
+		return NEM_err_static("NEM_disk_md_new_file: need root");
+	}
+
+	struct stat sb;
+	if (0 != stat(path, &sb)) {
+		return NEM_err_errno();
+	}
+	if (!S_ISREG(sb.st_mode)) {
+		return NEM_err_static("NEM_disk_md_new_file: not a file");
+	}
+
+	struct md_ioctl md = {
+		.md_version   = MDIOVERSION,
+		.md_type      = MD_VNODE,
+		.md_options   = MD_CLUSTER | MD_AUTOUNIT,
+		.md_mediasize = sb.st_size,
+		.md_file      = (char*) path,
+	};
+	if (ro) {
+		md.md_options |= MD_READONLY;
+	}
+
+	err = NEM_disk_md_new(out, &md);
+	if (NEM_err_ok(err)) {
+		(*out)->writable = !ro;
+		(*out)->source = strdup(path);
+	}
+	return err;
+}
 
 static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])

@@ -181,6 +181,18 @@ NEM_rootd_config_root()
 	return static_config.configdir;
 }
 
+bool
+NEM_rootd_is_init()
+{
+	return static_config.is_init;
+}
+
+bool
+NEM_rootd_is_root()
+{
+	return static_config.is_root;
+}
+
 const char*
 NEM_rootd_routerd_path()
 {
