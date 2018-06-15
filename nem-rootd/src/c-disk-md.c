@@ -85,6 +85,24 @@ NEM_md_alloc(int unit)
 static void
 NEM_md_free_internal(NEM_disk_md_t *this)
 {
+	if (this->owned) {
+		int ctlfd = open("/dev/" MDCTL_NAME, O_RDWR|O_CLOEXEC);
+		if (0 > ctlfd) {
+			NEM_panicf_errno("NEM_md_free_internal: unable to open mdctl");
+		}
+
+		struct md_ioctl params = {
+			.md_unit = this->unit,
+		};
+
+		int ioret = ioctl(ctlfd, MDIOCDETACH, &params);
+		close(ctlfd);
+
+		if (-1 == ioret) {
+			NEM_panicf_errno("NEM_md_free_internal: unable to detach");
+		}
+	}
+
 	free(this->device);
 	free(this->source);
 	free(this->dest);
