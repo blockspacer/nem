@@ -99,6 +99,42 @@ hex_encode(char *out, const char *in, size_t in_len)
 	}
 }
 
+static struct {
+	const char *prefix;
+	size_t      amount;
+}
+eng_encode_units[] = {
+	{ "Pb", 1024L * 1024L * 1024L * 1024L * 1024L },
+	{ "Tb", 1024L * 1024L * 1024L * 1024L },
+	{ "Gb", 1024L * 1024L * 1024L },
+	{ "Mb", 1024L * 1024L },
+	{ "Kb", 1024L },
+};
+
+static long
+eng_encode(size_t val)
+{
+	for (size_t i = 0; i < NEM_ARRSIZE(eng_encode_units); i += 1) {
+		if (val > 9 * eng_encode_units[i].amount) {
+			return val / eng_encode_units[i].amount;
+		}
+	}
+
+	return val;
+}
+
+static const char*
+eng_encode_unit(size_t val)
+{
+	for (size_t i = 0; i < NEM_ARRSIZE(eng_encode_units); i += 1) {
+		if (val > 9 * eng_encode_units[i].amount) {
+			return eng_encode_units[i].prefix;
+		}
+	}
+
+	return "b ";
+}
+
 static NEM_err_t
 load_version_status(NEM_imgver_t *imgv)
 {
@@ -361,10 +397,11 @@ setup(NEM_app_t *app, int argc, char *argv[])
 			NEM_imgver_t *ver = NEM_imgset_imgver_by_id(&static_imgset, id);
 			NEM_logf(
 				COMP_IMAGES,
-				"    %12.12s... %12s   %6db %s", 
+				"    %12.12s... %12s   %6d%s %s", 
 				ver->sha256,
 				ver->version,
-				ver->size,
+				eng_encode(ver->size),
+				eng_encode_unit(ver->size),
 				NEM_imgver_status_string(ver->status)
 			);
 		}
