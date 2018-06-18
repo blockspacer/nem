@@ -397,7 +397,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 			NEM_imgver_t *ver = NEM_imgset_imgver_by_id(&static_imgset, id);
 			NEM_logf(
 				COMP_IMAGES,
-				"    %12.12s... %12s   %6d%s %s", 
+				"    %12.12s... %8s %5d%s %s", 
 				ver->sha256,
 				ver->version,
 				eng_encode(ver->size),
