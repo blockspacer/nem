@@ -105,25 +105,28 @@ NEM_disk_base_cmp_name(const void *vlhs, const void *vrhs)
 
 static void
 NEM_disk_base_init(
-	NEM_disk_base_t *this,
-	NEM_disk_set_t  *set,
-	const char      *name
+	NEM_disk_base_t        *this,
+	NEM_disk_set_t         *set,
+	const char             *name,
+	const NEM_disk_base_vt *vt
 ) {
 	bzero(this, sizeof(*this));
 	this->set = set;
 	this->name = strdup(name);
 	this->refcount = 1;
+	this->vt = vt;
 
 	LIST_INSERT_HEAD(&set->disks, this, entry);
 }
 
 static void
 NEM_disk_base_init_geom(
-	NEM_disk_base_t    *this,
-	NEM_disk_set_t     *set,
-	const struct ggeom *geom
+	NEM_disk_base_t        *this,
+	NEM_disk_set_t         *set,
+	const struct ggeom     *geom,
+	const NEM_disk_base_vt *vt
 ) {
-	NEM_disk_base_init(this, set, geom->lg_name);
+	NEM_disk_base_init(this, set, geom->lg_name, vt);
 	this->foreign = true;
 }
 
@@ -193,7 +196,7 @@ NEM_disk_md_ctl(int cmd, struct md_ioctl *params)
 	}
 
 	NEM_err_t err = NEM_err_none;
-	if (-1 == ioctl(ctlfd, cmd, &params)) {
+	if (-1 == ioctl(ctlfd, cmd, params)) {
 		err = NEM_err_errno();
 	}
 
@@ -210,7 +213,7 @@ NEM_disk_md_init_geom(
 	const struct gprovider *prov = LIST_FIRST(&geom->lg_provider);
 	// XXX: assert that the list has exactly one entry?
 	
-	NEM_disk_base_init_geom(&this->base, set, geom);
+	NEM_disk_base_init_geom(&this->base, set, geom, &NEM_disk_md_vt);
 
 	const char *file = geom_config_str(&prov->lg_config, "file");
 	this->file = (NULL != file) ? strdup(file) : NULL;
@@ -218,6 +221,30 @@ NEM_disk_md_init_geom(
 	this->type = md_type_from_str(geom_config_str(&prov->lg_config, "type"));
 	this->length = geom_config_long(&prov->lg_config, "length");
 	this->unit = geom_config_int(&prov->lg_config, "unit");
+
+	return NEM_err_none;
+}
+
+static NEM_err_t
+NEM_disk_md_new_params(
+	NEM_disk_md_t  **out,
+	NEM_disk_set_t  *set,
+	struct md_ioctl *params
+) {
+	NEM_disk_md_t *this = NEM_malloc(sizeof(NEM_disk_md_t));
+	*out = this;
+
+	char buf[10] = {0};
+	snprintf(buf, sizeof(buf), MD_NAME "%d", params->md_unit);
+
+	NEM_disk_base_init(&this->base, set, buf, &NEM_disk_md_vt);
+	this->file = NULL == params->md_file ? NULL : strdup(params->md_file);
+	this->access = MD_READONLY & params->md_options
+		? strdup("read-only")
+		: strdup("read-write");
+	this->type = params->md_type;
+	this->length = params->md_mediasize;
+	this->unit = params->md_unit;
 
 	return NEM_err_none;
 }
@@ -240,13 +267,13 @@ NEM_disk_md_new_geom(
 }
 
 static NEM_err_t
-NEM_disk_md_init_mem(NEM_disk_md_t *this, NEM_disk_set_t *set, size_t len)
+NEM_disk_md_new_mem(NEM_disk_md_t **out, NEM_disk_set_t *set, size_t len)
 {
 	struct md_ioctl params = {
 		.md_version   = MDIOVERSION,
 		.md_type      = MD_MALLOC,
 		.md_mediasize = len,
-		.md_options   = MD_CLUSTER | MD_AUTOUNIT,
+		.md_options   = MD_AUTOUNIT,
 	};
 
 	NEM_err_t err = NEM_disk_md_ctl(MDIOCATTACH, &params);
@@ -254,17 +281,12 @@ NEM_disk_md_init_mem(NEM_disk_md_t *this, NEM_disk_set_t *set, size_t len)
 		return err;
 	}
 
-	this->file = NULL;
-	this->access = strdup("read-write");
-	this->type = MD_MALLOC;
-	this->length = len;
-	this->unit = params.md_unit;
-	return NEM_err_none;
+	return NEM_disk_md_new_params(out, set, &params);
 }
 
 static NEM_err_t
-NEM_disk_md_init_file(
-	NEM_disk_md_t  *this,
+NEM_disk_md_new_file(
+	NEM_disk_md_t **out,
 	NEM_disk_set_t *set,
 	const char     *file,
 	bool            ro
@@ -281,7 +303,8 @@ NEM_disk_md_init_file(
 		.md_version   = MDIOVERSION,
 		.md_type      = MD_VNODE,
 		.md_mediasize = sb.st_size,
-		.md_options   = MD_CLUSTER | MD_AUTOUNIT,
+		.md_options   = MD_AUTOUNIT | MD_CLUSTER,
+		.md_file      = (char*) file,
 	};
 	if (ro) {
 		params.md_options |= MD_READONLY;
@@ -292,12 +315,7 @@ NEM_disk_md_init_file(
 		return err;
 	}
 
-	this->file = strdup(file);
-	this->access = strdup(ro ? "read-only" : "read-write");
-	this->type = MD_VNODE;
-	this->length = sb.st_size;
-	this->unit = params.md_unit;
-	return NEM_err_none;
+	return NEM_disk_md_new_params(out, set, &params);
 }
 
 static NEM_err_t
@@ -386,6 +404,29 @@ static const NEM_disk_base_vt *disk_vts[] = {
 	&NEM_disk_md_vt,
 };
 
+static const NEM_disk_base_vt*
+find_disk_vt(const char *name)
+{
+	for (size_t i = 0; i < NEM_ARRSIZE(disk_vts); i += 1) {
+		if (0 == strcmp(name, disk_vts[i]->geom_class)) {
+			return disk_vts[i];
+		}
+	}
+	return NULL;
+}
+
+NEM_disk_base_t*
+NEM_disk_set_find_geom(NEM_disk_set_t *this, const struct ggeom *geom)
+{
+	NEM_disk_base_t *entry = NULL;
+	LIST_FOREACH(entry, &this->disks, entry) {
+		if (!strcmp(entry->name, geom->lg_name)) {
+			return entry;
+		}
+	}
+	return NULL;
+}
+
 NEM_err_t
 NEM_disk_set_rescan(NEM_disk_set_t *this)
 {
@@ -402,27 +443,22 @@ NEM_disk_set_rescan(NEM_disk_set_t *this)
 
 	struct gclass *cls = NULL;
 	struct ggeom *geom = NULL;
+	NEM_err_t err = NEM_err_none;
 
 	LIST_FOREACH(cls, &tree.lg_class, lg_class) {
-		const NEM_disk_base_vt *vt = NULL;
-		for (size_t i = 0; i < NEM_ARRSIZE(disk_vts); i += 1) {
-			if (0 == strcmp(disk_vts[i]->geom_class, cls->lg_name)) {
-				vt = disk_vts[i];
-				break;
-			}
-		}
+		const NEM_disk_base_vt *vt = find_disk_vt(cls->lg_name);
 		if (NULL == vt) {
 			continue;
 		}
 
 		LIST_FOREACH(geom, &cls->lg_geom, lg_geom) {
 			NEM_disk_base_t *disk = NULL;
-			// XXX: THIS IS WRONG! Need to find the existing entry if
-			// we've got it.
-			NEM_err_t err = vt->new_geom(this, geom, &disk);
-			if (!NEM_err_ok(err)) {
-				// XXX: Cleanup?
-				return err;
+
+			if (NULL == disk) {
+				err = vt->new_geom(this, geom, &disk);
+				if (!NEM_err_ok(err)) {
+					goto done;
+				}
 			}
 
 			disk->seen = true;
@@ -431,18 +467,46 @@ NEM_disk_set_rescan(NEM_disk_set_t *this)
 
 	// Then free anything that's no longer here.
 	LIST_FOREACH_SAFE(entry, &this->disks, entry, tmp) {
+		if (!entry->seen) {
+			// XXX: Errors here.
+			entry->vt->free(entry);
+		}
 	}
 
-	return NEM_err_none;
+done:
+	geom_deletetree(&tree);
+	return err;
 }
 
 void
 NEM_disk_set_free(NEM_disk_set_t *this)
 {
+	NEM_disk_base_t *entry = NULL, *tmp = NULL;
+	LIST_FOREACH_SAFE(entry, &this->disks, entry, tmp) {
+		entry->vt->free(entry);
+	}
 }
 
 int
 main(int argc, char *argv[])
 {
-	printf("hello\n");
+	NEM_disk_set_t set;
+	NEM_disk_set_init(&set);
+	NEM_panic_if_err(NEM_disk_set_rescan(&set));
+	NEM_panic_if_err(NEM_disk_set_rescan(&set));
+
+	NEM_disk_md_t *mem;
+	NEM_panic_if_err(NEM_disk_md_new_mem(&mem, &set, 10000));
+
+	NEM_disk_base_t *entry = NULL;
+	LIST_FOREACH(entry, &set.disks, entry) {
+		printf(
+			"%s (%s) -> %50.50s\n",
+			entry->foreign ? "foreign" : "owned",
+			entry->name,
+			((NEM_disk_md_t*)entry)->file
+		);
+	}
+
+	NEM_disk_set_free(&set);
 }
