@@ -14,6 +14,7 @@ LIBS="
 	-lexecinfo
 	-lz
 	-lbson-1.0
+	-lgeom
 "
 
 BUILD_FLAGS="
@@ -26,28 +27,27 @@ BUILD_FLAGS="
 	-isystem/usr/local/include
 	-Iinc
 	-I../libnem/inc
+	-I../libnemsvc/inc
 "
 
 mkdir -p bin
 
 NORMAL_THINGS="
-	server
-	client
 	dump-mount
+	store-geom
 "
 
 for exe in $NORMAL_THINGS ; do
-	$CC -o ./bin/$exe $BUILD_FLAGS $LIBS src/$exe.c ../libnem/bin/libnem.a
+	$CC -o ./bin/$exe $BUILD_FLAGS $LIBS src/$exe.c \
+		../libnem/bin/libnem.a \
+		../libnemsvc/bin/libnemsvc.a 
 done
 
-$CC -o ./bin/dump-geom $BUILD_FLAGS $LIBS \
-	src/dump-geom.c ../libnem/bin/libnem.a -lgeom
-
-mkdir -p obj/client.img/bin
-mkdir -p obj/client.img/lib
-mkdir -p obj/client.img/libexec
-cp `ldd -f '%p ' bin/client` obj/client.img/lib
-cp bin/client obj/client.img/bin
-cp /libexec/ld-elf.so* obj/client.img/libexec
-makefs bin/client.img obj/client.img > /dev/null
-rm -rf obj/client.img
+#mkdir -p obj/client.img/bin
+#mkdir -p obj/client.img/lib
+#mkdir -p obj/client.img/libexec
+#cp `ldd -f '%p ' bin/client` obj/client.img/lib
+#cp bin/client obj/client.img/bin
+#cp /libexec/ld-elf.so* obj/client.img/libexec
+#makefs bin/client.img obj/client.img > /dev/null
+#rm -rf obj/client.img
