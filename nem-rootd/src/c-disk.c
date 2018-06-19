@@ -5,14 +5,14 @@
 #include <limits.h>
 
 #include "nem.h"
-#include "c-disk-md.h"
+#include "c-disk.h"
 #include "c-log.h"
 #include "c-config.h"
 #include "utils.h"
 
 typedef struct NEM_mdlist_t NEM_mdlist_t;;
 
-struct NEM_disk_md_t {
+typedef struct {
 	NEM_mdlist_t *list;
 
 	int    unit;
@@ -20,12 +20,12 @@ struct NEM_disk_md_t {
 	size_t len;
 	char  *device;
 	char  *source; // NB: May be NULL (mem).
-	char  *dest;   // NB: May be NULL (unmounted).
 	bool   owned;
 	bool   writable;
 	bool   mounted;
 	bool   seen; // NB: used for mark/sweep purposes.
-};
+}
+NEM_disk_md_t;
 
 struct NEM_mdlist_t {
 	// NB: ordering isn't important here; these are individually
@@ -105,15 +105,33 @@ NEM_md_free_internal(NEM_disk_md_t *this)
 
 	free(this->device);
 	free(this->source);
-	free(this->dest);
 	free(this);
 }
 
 static void NEM_mdlist_remove_md(NEM_mdlist_t *list, NEM_disk_md_t *md);
 
-void
-NEM_disk_md_free(NEM_disk_md_t *this)
+/*
+ * NEM_disk_t implementation for NEM_disk_md_t
+ */
+
+NEM_disk_type_t
+NEM_disk_md_type(void *vthis)
 {
+	return NEM_DISK_VIRTUAL;
+}
+
+const char*
+NEM_disk_md_device(void *vthis)
+{
+	NEM_disk_md_t *this = vthis;
+	return this->device;
+}
+
+void
+NEM_disk_md_free(void *vthis)
+{
+	NEM_disk_md_t *this = vthis;
+
 	if (0 == this->refcount) {
 		NEM_panic("NEM_md_free: corrupt refcount");
 	}
@@ -125,35 +143,37 @@ NEM_disk_md_free(NEM_disk_md_t *this)
 	}
 }
 
-int
-NEM_disk_md_unit(NEM_disk_md_t *this)
+bool
+NEM_disk_md_mounted(void *vthis)
 {
-	return this->unit;
+	NEM_disk_md_t *this = vthis;
+	return this->mounted;
 }
 
-const char*
-NEM_disk_md_device(NEM_disk_md_t *this)
+bool
+NEM_disk_md_readonly(void *vthis)
 {
-	return this->device;
+	NEM_disk_md_t *this = vthis;
+	return !this->writable;
 }
+
+const NEM_disk_vt NEM_disk_md_vt = {
+	.type     = &NEM_disk_md_type,
+	.device   = &NEM_disk_md_device,
+	.free     = &NEM_disk_md_free,
+	.mounted  = &NEM_disk_md_mounted,
+	.readonly = &NEM_disk_md_readonly,
+};
+
+/*
+ * NEM_mdlist_t methods -- XXX: Just bother with NEM_disk_t's.
+ */
 
 static NEM_disk_md_t*
 NEM_mdlist_by_unit(NEM_mdlist_t *this, int unit)
 {
 	for (size_t i = 0; i < this->mds_len; i += 1) {
 		if (this->mds[i]->unit == unit) {
-			return this->mds[i];
-		}
-	}
-	return NULL;
-}
-
-static NEM_disk_md_t*
-NEM_mdlist_by_dest(NEM_mdlist_t *this, const char *dest)
-{
-	// XXX: realpath(dest)? from geom it's always correct and immutable.
-	for (size_t i = 0; i < this->mds_len; i += 1) {
-		if (NULL != this->mds[i]->dest && !strcmp(this->mds[i]->dest, dest)) {
 			return this->mds[i];
 		}
 	}
@@ -260,7 +280,7 @@ NEM_mdlist_add_provider(NEM_mdlist_t *this, const struct gprovider *prov)
 			|| (NULL != file && NULL != md->source)
 		) {
 			NEM_logf(
-				COMP_MOUNTS,
+				COMP_DISK,
 				"underlying md changed wtf?\n'%s' -> '%s'",
 				md->source,
 				file
@@ -361,13 +381,19 @@ NEM_disk_md_new(NEM_disk_md_t **pout, struct md_ioctl *params)
 }
 
 NEM_err_t
-NEM_disk_md_new_mem(NEM_disk_md_t **out, size_t len)
+NEM_disk_init(NEM_disk_t *out, const char *device)
+{
+	NEM_panic("TODO");
+}
+
+NEM_err_t
+NEM_disk_init_mem(NEM_disk_t *out, size_t len)
 {
 	NEM_mdlist_t *this = &static_mdlist;
-	*out = NULL;
+	NEM_disk_md_t *md = NULL;
 
 	for (size_t i = 0; i < this->mds_len; i += 1) {
-		NEM_disk_md_t *md = this->mds[i];
+		md = this->mds[i];
 		if (
 			0 != md->refcount
 			|| md->mounted
@@ -379,7 +405,8 @@ NEM_disk_md_new_mem(NEM_disk_md_t **out, size_t len)
 
 		if (md->len == len) {
 			md->refcount += 1;
-			*out = md;
+			out->vt = &NEM_disk_md_vt;
+			out->this = md;
 			return NEM_err_none;
 		}
 	}
@@ -388,26 +415,28 @@ NEM_disk_md_new_mem(NEM_disk_md_t **out, size_t len)
 		return NEM_err_static("NEM_disk_md_new_mem: need root");
 	}
 
-	struct md_ioctl md = {
+	struct md_ioctl params = {
 		.md_version   = MDIOVERSION,
 		.md_type      = MD_MALLOC,
 		.md_mediasize = len,
 		.md_options   = MD_CLUSTER | MD_AUTOUNIT,
 	};
 
-	NEM_err_t err = NEM_disk_md_new(out, &md);
+	NEM_err_t err = NEM_disk_md_new(&md, &params);
 	if (NEM_err_ok(err)) {
-		(*out)->writable = true;
+		md->writable = true;
+		out->vt = &NEM_disk_md_vt;
+		out->this = md;
 	}
 
 	return err;
 }
 
 NEM_err_t
-NEM_disk_md_new_file(NEM_disk_md_t **out, const char *path, bool ro)
+NEM_disk_init_file(NEM_disk_t *out, const char *path, bool ro)
 {
 	NEM_mdlist_t *this = &static_mdlist;
-	*out = NULL;
+	NEM_disk_md_t *md = NULL;
 
 	char *tmp_path = strdup(path);
 	NEM_err_t err = NEM_path_abs(&tmp_path);
@@ -417,7 +446,7 @@ NEM_disk_md_new_file(NEM_disk_md_t **out, const char *path, bool ro)
 	}
 
 	for (size_t i = 0; i < this->mds_len; i += 1) {
-		NEM_disk_md_t *md = this->mds[i];
+		md = this->mds[i];
 		if (
 			0 != md->refcount
 			|| md->mounted
@@ -429,7 +458,8 @@ NEM_disk_md_new_file(NEM_disk_md_t **out, const char *path, bool ro)
 
 		if (0 == strcmp(md->source, path)) {
 			md->refcount += 1;
-			*out = md;
+			out->vt = &NEM_disk_md_vt;
+			out->this = md;
 			return NEM_err_none;
 		}
 	}
@@ -446,7 +476,7 @@ NEM_disk_md_new_file(NEM_disk_md_t **out, const char *path, bool ro)
 		return NEM_err_static("NEM_disk_md_new_file: not a file");
 	}
 
-	struct md_ioctl md = {
+	struct md_ioctl params = {
 		.md_version   = MDIOVERSION,
 		.md_type      = MD_VNODE,
 		.md_options   = MD_CLUSTER | MD_AUTOUNIT,
@@ -454,13 +484,15 @@ NEM_disk_md_new_file(NEM_disk_md_t **out, const char *path, bool ro)
 		.md_file      = (char*) path,
 	};
 	if (ro) {
-		md.md_options |= MD_READONLY;
+		params.md_options |= MD_READONLY;
 	}
 
-	err = NEM_disk_md_new(out, &md);
+	err = NEM_disk_md_new(&md, &params);
 	if (NEM_err_ok(err)) {
-		(*out)->writable = !ro;
-		(*out)->source = strdup(path);
+		md->writable = !ro;
+		md->source = strdup(path);
+		out->vt = &NEM_disk_md_vt;
+		out->this = md;
 	}
 	return err;
 }
@@ -472,7 +504,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 		NEM_panicf("mounts: corrupt static_mdlist during setup");
 	}
 
-	NEM_logf(COMP_MD, "setup");
+	NEM_logf(COMP_DISK, "setup");
 	NEM_err_t err = NEM_mdlist_rescan(&static_mdlist);
 	if (!NEM_err_ok(err)) {
 		NEM_mdlist_clear(&static_mdlist);
@@ -481,15 +513,13 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	for (size_t i = 0; i < static_mdlist.mds_len; i += 1) {
 		NEM_disk_md_t *md = static_mdlist.mds[i];
 		NEM_logf(
-			COMP_MD,
-			"  md%d: (%s, %s) %s -> %s",
-			md->unit,
+			COMP_DISK,
+			"  %s: (%s, %s%s) %.40s...",
+			md->device,
 			md->writable ? "rw" : "ro",
 			md->owned ? "ours" : "foreign",
-			md->source != NULL ? md->source : "(mem)",
-			md->mounted
-				? (md->dest != NULL ? md->dest : "(unknown)")
-				: "unmounted"
+			md->mounted ? ", mounted" : "",
+			md->source != NULL ? md->source : "(mem)"
 		);
 	}
 
@@ -499,11 +529,11 @@ setup(NEM_app_t *app, int argc, char *argv[])
 static void
 teardown(NEM_app_t *app)
 {
-	NEM_logf(COMP_MD, "teardown");
+	NEM_logf(COMP_DISK, "teardown");
 }
 
 const NEM_app_comp_t NEM_rootd_c_disk_md = {
-	.name     = "md",
+	.name     = "disk-md",
 	.setup    = &setup,
 	.teardown = &teardown,
 };

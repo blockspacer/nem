@@ -5,7 +5,7 @@
 #include "nem.h"
 #include "c-mounts.h"
 #include "c-log.h"
-#include "c-disk-md.h"
+#include "c-disk.h"
 
 typedef enum {
 	NEM_MOUNT_UFS,
@@ -54,7 +54,7 @@ struct NEM_mount_t {
 	LIST_ENTRY(NEM_mount_t) link;
 
 	NEM_mount_type_t type;
-	NEM_disk_md_t   *disk; // NB: non-NULL for MD mounts.
+	NEM_disk_t       disk; // NB: empty for NULLFS mounts.
 	char            *source;
 	char            *dest;
 	bool             owned;
@@ -84,8 +84,9 @@ NEM_mount_free(NEM_mount_t *this)
 		NEM_panic("TODO: unmount");
 	}
 
-	if (NULL != this->disk) {
-		NEM_disk_md_free(this->disk);
+	// XXX: Generalize this a bit?
+	if (NULL != this->disk.this) {
+		NEM_disk_free(this->disk);
 	}
 
 	free(this->source);

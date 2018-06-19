@@ -21,7 +21,7 @@ NEM_comp_name(NEM_rootd_comp_t comp)
 		{ COMP_ROUTERD,  "routerd"  },
 		{ COMP_IMAGES,   "images"   },
 		{ COMP_MOUNTS,   "mounts"   },
-		{ COMP_MD,       "md"       },
+		{ COMP_DISK,     "disks"    },
 		{ COMP_JAILS,    "jails"    },
 	};
 
@@ -49,7 +49,7 @@ NEM_logf(NEM_rootd_comp_t comp, const char *fmt, ...)
 	}
 
 	if (NEM_rootd_verbose() && !NEM_rootd_testing) {
-		printf("%s: %s\n", NEM_comp_name(comp), entry);
+		printf("%8.8s: %s\n", NEM_comp_name(comp), entry);
 	}
 
 	free(entry);
