@@ -6,6 +6,8 @@
 #include "c-mounts.h"
 #include "c-log.h"
 #include "c-disk.h"
+#include "c-config.h"
+#include "utils.h"
 
 typedef enum {
 	NEM_MOUNT_UFS,
@@ -78,7 +80,7 @@ NEM_mount_cmp(const NEM_mount_t *lhs, const NEM_mount_t *rhs)
 }
 
 static void
-NEM_mount_free_internal(NEM_mount_t *this)
+NEM_mount_free(NEM_mount_t *this)
 {
 	if (this->owned) {
 		// XXX: unmount.
@@ -118,7 +120,7 @@ NEM_mountlist_free(NEM_mountlist_t *this)
 	// NB: New entries are prependede to the list, so forward iteration
 	// is newest -> oldest mounts.
 	LIST_FOREACH_SAFE(entry, this, link, tmp) {
-		NEM_mount_free_internal(entry);
+		NEM_mount_free(entry);
 		LIST_REMOVE(entry, link);
 		free(entry);
 	}
@@ -179,13 +181,29 @@ NEM_mountlist_rescan(NEM_mountlist_t *this)
 		// probably note that it's dead because weird stuff might happen?
 		// How often are we bothering to rescan? I dunno.
 		if (!entry->seen && 0 == entry->refcount) {
-			NEM_mount_free_internal(entry);
+			NEM_mount_free(entry);
 			LIST_REMOVE(entry, link);
 			free(entry);
 		}
 	}
 
 	return NEM_err_none;
+}
+
+void
+NEM_mount_images(
+	const NEM_jailimg_t *imgs,
+	size_t               imgs_len,
+	const char          *base,
+	NEM_thunk1_t        *thunk
+) {
+	// TODO
+}
+
+void
+NEM_unmount_set(NEM_mountset_t *set)
+{
+	// TODO
 }
 
 static NEM_err_t
@@ -196,6 +214,33 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	}
 
 	NEM_logf(COMP_MOUNTS, "setup");
+
+	static const struct {
+		const char *path;
+		bool        empty;
+	}
+	dirs[] = {
+		{ "mounts",           false },
+		{ "mounts/tmp",       true  },
+		{ "mounts/empty",     true  },
+		{ "mounts/null",      false },
+		{ "mounts/persisted", false },
+	};
+	char tmp[PATH_MAX] = {0};
+
+	for (size_t i = 0; i < NEM_ARRSIZE(dirs); i += 1) {
+		snprintf(tmp, sizeof(tmp), "%s/%s", NEM_rootd_run_root(), dirs[i].path);
+		NEM_err_t err = NEM_ensure_dir(tmp);
+		if (!NEM_err_ok(err)) {
+			return err;
+		}
+		if (dirs[i].empty) {
+			err = NEM_erase_dir(tmp);
+			if (!NEM_err_ok(err)) {
+				return err;
+			}
+		}
+	}
 
 	NEM_err_t err = NEM_mountlist_rescan(&static_mounts);
 	if (!NEM_err_ok(err)) {
