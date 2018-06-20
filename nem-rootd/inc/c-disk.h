@@ -1,14 +1,5 @@
 #pragma once
 
-typedef enum {
-	NEM_DISK_NONE,      // empty disk
-	NEM_DISK_PHYSICAL,  // disk
-	NEM_DISK_PARTITION, // part
-	NEM_DISK_ENCRYPT,   // eli
-	NEM_DISK_VIRTUAL,   // md
-}
-NEM_disk_type_t;
-
 typedef struct NEM_disk_t NEM_disk_t;
 
 // NEM_disk_init_device initializes a disk given a device path. The device
@@ -30,11 +21,7 @@ NEM_err_t NEM_disk_init_file(NEM_disk_t **out, const char *path, bool ro);
 // removed.
 void NEM_disk_free(NEM_disk_t *this);
 
-NEM_disk_type_t NEM_disk_type(NEM_disk_t *this);
 const char *NEM_disk_device(NEM_disk_t *this);
-bool NEM_disk_mounted(NEM_disk_t *this);
-bool NEM_disk_readonly(NEM_disk_t *this);
-
 const char *NEM_disk_dbg_string(NEM_disk_t *this);
 
 extern const NEM_app_comp_t NEM_rootd_c_disk;

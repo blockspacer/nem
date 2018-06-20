@@ -262,8 +262,20 @@ static char*
 NEM_disk_md_dbg_string(NEM_disk_t *vthis)
 {
 	NEM_disk_md_t *this = (NEM_disk_md_t*) vthis;
+
+	char flags[80] = {0};
+	strcat(flags, this->base.foreign ? "foreign" : "owned");
+	strcat(flags, strcmp(this->access, "read-only") ? "" : ",ro");
+
 	char *out = NULL;
-	asprintf(&out, "%s", this->base.name);
+	asprintf(
+		&out,
+		"%s (%12.12s): %50.50s",
+		this->base.name,
+		flags,
+		this->file
+	);
+
 	return out;
 }
 
@@ -509,6 +521,16 @@ NEM_diskset_free(NEM_diskset_t *this)
 static NEM_diskset_t static_disks = {{0}};
 
 const char*
+NEM_disk_device(NEM_disk_t *this)
+{
+	if (NULL == this) {
+		return "(null)";
+	}
+
+	return this->name;
+}
+
+const char*
 NEM_disk_dbg_string(NEM_disk_t *this)
 {
 	if (NULL == this) {
@@ -599,9 +621,8 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	LIST_FOREACH(entry, &static_disks.disks, entry) {
 		NEM_logf(
 			COMP_DISK,
-			"  %s: (%s) <info>...",
-			entry->name,
-			entry->foreign ? "foreign" : "owned"
+			"  - %s",
+			NEM_disk_dbg_string(entry)
 		);
 	}
 

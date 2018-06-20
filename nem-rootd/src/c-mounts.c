@@ -201,11 +201,11 @@ setup(NEM_app_t *app, int argc, char *argv[])
 	LIST_FOREACH(mount, &static_mounts, link) {
 		NEM_logf(
 			COMP_MOUNTS,
-			"  - %8.8s:%s %s -> %s",
+			"  - %8.8s:%s %s via %s",
 			NEM_mount_type_str(mount->type),
 			mount->owned ? "" : " (foreign)",
-			NEM_disk_dbg_string(mount->disk), //mount->source,
-			mount->dest
+			mount->dest,
+			NEM_disk_device(mount->disk)
 		);
 	}
 
