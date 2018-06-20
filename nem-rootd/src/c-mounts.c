@@ -54,7 +54,7 @@ struct NEM_mount_t {
 	LIST_ENTRY(NEM_mount_t) link;
 
 	NEM_mount_type_t type;
-	NEM_disk_t       disk; // NB: empty for NULLFS mounts.
+	NEM_disk_t      *disk; // NB: empty for NULLFS mounts.
 	char            *source;
 	char            *dest;
 	bool             owned;
@@ -85,8 +85,9 @@ NEM_mount_free(NEM_mount_t *this)
 	}
 
 	// XXX: Generalize this a bit?
-	if (NULL != this->disk.this) {
+	if (NULL != this->disk) {
 		NEM_disk_free(this->disk);
+		this->disk = NULL;
 	}
 
 	free(this->source);
