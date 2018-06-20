@@ -483,8 +483,7 @@ NEM_diskset_rescan(NEM_diskset_t *this)
 		}
 
 		LIST_FOREACH(geom, &cls->lg_geom, lg_geom) {
-			NEM_disk_t *disk = NULL;
-
+			NEM_disk_t *disk = NEM_diskset_find_geom(this, geom);
 			if (NULL == disk) {
 				err = vt->new_geom(this, geom, &disk);
 				if (!NEM_err_ok(err)) {
@@ -556,7 +555,7 @@ NEM_disk_free(NEM_disk_t *this)
 
 	this->refcount -= 1;
 	if (0 == this->refcount) {
-		NEM_disk_free_internal(this);
+		this->vt->free(this);
 	}
 }
 
