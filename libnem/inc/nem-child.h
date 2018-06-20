@@ -14,6 +14,7 @@ NEM_child_state_t;
 typedef struct {
 	int               kq;
 	int               exe_fd;
+	int               exitcode;
 	pid_t             pid;
 	NEM_child_state_t state;
 	NEM_fd_t          fd;
@@ -22,6 +23,19 @@ typedef struct {
 	NEM_thunk1_t     *on_close;
 }
 NEM_child_t;
+
+typedef struct {
+	// args and env are NULL-terminated lists of NULL-terminated strings that 
+	// are set-able during the thunk invocation of NEM_child_init. These
+	// control the child invocation. They can be heap allocated freely since
+	// they're executed post-fork but pre-exec.
+	char **args;
+	char **env;
+
+	// exitcode is set when the on_close callback is set.
+	int exitcode;
+}
+NEM_child_ca;
 
 // NEM_child_init initializes and forks a child process. The caller may pass
 // a thunk1 to execute between fork/execve -- or NULL. If an error is returned

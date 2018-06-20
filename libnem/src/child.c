@@ -11,8 +11,20 @@ NEM_child_on_kevent(NEM_thunk_t *thunk, void *varg)
 	}
 
 	this->state = CHILD_STOPPED;
+
+#if __FreeBSD__ >= 11
+	this->exitcode = kev->data;
+#else
+	// NB: https://svnweb.freebsd.org/base?view=revision&revision=285670
+	// was not backported.
+	this->exitcode = kev->data >> 8;
+#endif
+
 	if (NULL != this->on_close) {
-		NEM_thunk1_invoke(&this->on_close, NULL);
+		NEM_child_ca ca = {
+			.exitcode = this->exitcode,
+		};
+		NEM_thunk1_invoke(&this->on_close, &ca);
 	}
 }
 
@@ -60,16 +72,22 @@ NEM_child_init(
 		if (NEM_KQ_PARENT_FILENO != dup2(fd_out.fd_in, NEM_KQ_PARENT_FILENO)) {
 			NEM_panicf_errno("NEM_child_init: dup2");
 		}
-		// NB: Inherit stdout/stderr for now.
+		// NB: Inherit stdout/stderr for now. The caller can explicitly 
+		// dup2 them to whatever within the thunk.
+
+		char *default_args[] = { NULL };
+		char *default_env[] = { NULL };
+
+		NEM_child_ca ca = {
+			.args = default_args,
+			.env  = default_env,
+		};
 
 		if (NULL != preexec) {
-			NEM_thunk1_invoke(&preexec, NULL);
+			NEM_thunk1_invoke(&preexec, &ca);
 		}
-		
-		char *args[] = { NULL };
-		char *env[] = { NULL };
 
-		fexecve(this->exe_fd, args, env);
+		fexecve(this->exe_fd, ca.args, ca.env);
 		NEM_panicf_errno("NEM_child_init: execve");
 	}
 	NEM_fd_free(&fd_out);
@@ -104,7 +122,10 @@ NEM_err_t
 NEM_child_on_close(NEM_child_t *this, NEM_thunk1_t *thunk)
 {
 	if (this->state != CHILD_RUNNING) {
-		NEM_thunk1_invoke(&thunk, NULL);
+		NEM_child_ca ca = {
+			.exitcode = this->exitcode,
+		};
+		NEM_thunk1_invoke(&thunk, &ca);
 		return NEM_err_none;
 	}
 	if (NULL != this->on_close) {
