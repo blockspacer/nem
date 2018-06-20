@@ -93,7 +93,10 @@ NEM_app_shutdown_step(NEM_thunk1_t *thunk, void *varg)
 {
 	NEM_app_t *this = NEM_thunk1_ptr(thunk);
 
-	for (size_t i = 0; i < this->comps_len; i += 1) {
+	// NB: Do this in reverse order of initialization to match
+	// shutdown behavior.
+	for (size_t j = this->comps_len; j > 0; j -= 1) {
+		size_t i = j - 1;
 		if (!this->comps[i].running) {
 			continue;
 		}

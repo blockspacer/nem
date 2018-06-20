@@ -498,7 +498,10 @@ NEM_diskset_rescan(NEM_diskset_t *this)
 
 	// Then free anything that's no longer here.
 	LIST_FOREACH_SAFE(entry, &this->disks, entry, tmp) {
-		if (!entry->seen) {
+		// XXX: If the device goes away while we've still got a reference to it
+		// then we can't actually free it. Should probably mark it somehow as
+		// dead or something.
+		if (!entry->seen && 0 == entry->refcount) {
 			// XXX: Errors here.
 			entry->vt->free(entry);
 		}

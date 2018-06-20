@@ -57,6 +57,7 @@ struct NEM_mount_t {
 	NEM_disk_t      *disk; // NB: empty for NULLFS mounts.
 	char            *source;
 	char            *dest;
+	int              refcount;
 	bool             owned;
 	bool             seen;
 };
@@ -77,7 +78,7 @@ NEM_mount_cmp(const NEM_mount_t *lhs, const NEM_mount_t *rhs)
 }
 
 static void
-NEM_mount_free(NEM_mount_t *this)
+NEM_mount_free_internal(NEM_mount_t *this)
 {
 	if (this->owned) {
 		// XXX: unmount.
@@ -117,7 +118,7 @@ NEM_mountlist_free(NEM_mountlist_t *this)
 	// NB: New entries are prependede to the list, so forward iteration
 	// is newest -> oldest mounts.
 	LIST_FOREACH_SAFE(entry, this, link, tmp) {
-		NEM_mount_free(entry);
+		NEM_mount_free_internal(entry);
 		LIST_REMOVE(entry, link);
 		free(entry);
 	}
@@ -172,8 +173,13 @@ NEM_mountlist_rescan(NEM_mountlist_t *this)
 	free(mnts);
 
 	LIST_FOREACH_SAFE(entry, this, link, tmp) {
-		if (!entry->seen) {
-			NEM_mount_free(entry);
+		// XXX: This is kind of a weird edge-case where we've still got
+		// references to a filesystem but it's dead (e.g. removable media).
+		// We need to keep the references around on our side but should
+		// probably note that it's dead because weird stuff might happen?
+		// How often are we bothering to rescan? I dunno.
+		if (!entry->seen && 0 == entry->refcount) {
+			NEM_mount_free_internal(entry);
 			LIST_REMOVE(entry, link);
 			free(entry);
 		}
