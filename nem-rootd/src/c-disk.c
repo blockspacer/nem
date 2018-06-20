@@ -66,6 +66,10 @@ typedef struct {
 	// this type maps to.
 	const char *geom_class;
 
+	// dbg_string should return a heap-allocated string representation of the
+	// disk for debug purposes.
+	char* (*dbg_string)(NEM_disk_t*);
+
 	// new_geom should allocate, initialize, and return a new instance of the
 	// disk from the given geom.
 	NEM_err_t (*new_geom)(
@@ -86,6 +90,7 @@ struct NEM_disk_t {
 
 	NEM_diskset_t *set;
 	char          *name;
+	char          *dbg_string;
 	int            refcount;
 	bool           seen;
 	bool           foreign;
@@ -137,6 +142,7 @@ static void
 NEM_disk_free_internal(NEM_disk_t *this)
 {
 	free(this->name);
+	free(this->dbg_string);
 	LIST_REMOVE(this, entry);
 }
 
@@ -252,6 +258,15 @@ NEM_disk_md_new_params(
 	return NEM_err_none;
 }
 
+static char*
+NEM_disk_md_dbg_string(NEM_disk_t *vthis)
+{
+	NEM_disk_md_t *this = (NEM_disk_md_t*) vthis;
+	char *out = NULL;
+	asprintf(&out, "%s", this->base.name);
+	return out;
+}
+
 static NEM_err_t
 NEM_disk_md_new_geom(
 	NEM_diskset_t      *set,
@@ -350,6 +365,7 @@ NEM_disk_md_free(NEM_disk_t *vthis)
 
 static const NEM_disk_vt NEM_disk_md_vt = {
 	.geom_class = "MD",
+	.dbg_string = &NEM_disk_md_dbg_string,
 	.new_geom   = &NEM_disk_md_new_geom,
 	.free       = &NEM_disk_md_free,
 };
@@ -491,6 +507,20 @@ NEM_diskset_free(NEM_diskset_t *this)
 }
 
 static NEM_diskset_t static_disks = {{0}};
+
+const char*
+NEM_disk_dbg_string(NEM_disk_t *this)
+{
+	if (NULL == this) {
+		return "(null)";
+	}
+
+	if (NULL == this->dbg_string) {
+		this->dbg_string = this->vt->dbg_string(this);
+	}
+
+	return this->dbg_string;
+}
 
 void
 NEM_disk_free(NEM_disk_t *this)

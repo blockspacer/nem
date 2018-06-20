@@ -35,4 +35,6 @@ const char *NEM_disk_device(NEM_disk_t *this);
 bool NEM_disk_mounted(NEM_disk_t *this);
 bool NEM_disk_readonly(NEM_disk_t *this);
 
+const char *NEM_disk_dbg_string(NEM_disk_t *this);
+
 extern const NEM_app_comp_t NEM_rootd_c_disk;

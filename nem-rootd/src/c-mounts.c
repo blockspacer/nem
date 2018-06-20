@@ -163,6 +163,7 @@ NEM_mountlist_rescan(NEM_mountlist_t *this)
 			entry->source = strdup(mnts[i].f_mntfromname);
 			entry->dest = strdup(mnts[i].f_mntonname);
 			entry->owned = false;
+			NEM_disk_init_device(&entry->disk, entry->source);
 			LIST_INSERT_HEAD(this, entry, link);
 		}
 
@@ -203,7 +204,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 			"  - %8.8s:%s %s -> %s",
 			NEM_mount_type_str(mount->type),
 			mount->owned ? "" : " (foreign)",
-			mount->source,
+			NEM_disk_dbg_string(mount->disk), //mount->source,
 			mount->dest
 		);
 	}
