@@ -136,6 +136,37 @@ NEM_img_imgver_latest(NEM_imgset_t *set, NEM_img_t *this)
 }
 
 NEM_imgver_t*
+NEM_img_imgver_by_semver(
+	NEM_imgset_t *set,
+	NEM_img_t    *this,
+	const char   *require
+) {
+	NEM_semver_t best_sem;
+	NEM_imgver_t *best_ver = NULL;
+	NEM_semver_match_t match;
+
+	NEM_err_t err = NEM_semver_init_match(&best_sem, &match, require);
+	if (!NEM_err_ok(err)) {
+		return NULL;
+	}
+
+	for (size_t i = 0; i < this->vers_len; i += 1) {
+		NEM_imgver_t *test = &set->vers[this->vers[i]];
+		NEM_semver_t test_sem;
+		if (!NEM_err_ok(NEM_semver_init(&test_sem, test->version))) {
+			// XXX: Should probably log this out somewhere.
+			continue;
+		}
+		
+		if (0 <= NEM_semver_cmp(&best_sem, &test_sem, match)) {
+			best_ver = test;
+		}
+	}
+
+	return best_ver;
+}
+
+NEM_imgver_t*
 NEM_img_imgver_by_hash(
 	NEM_imgset_t *set,
 	NEM_img_t    *this,

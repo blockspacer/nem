@@ -124,8 +124,8 @@ START_TEST(img_dupe)
 }
 END_TEST
 
-static const char *SHA256 =
-	"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+#define SHA256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+#define SHA256_ "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85"
 
 START_TEST(err_ver_bad_id)
 {
@@ -312,6 +312,50 @@ START_TEST(ver_link)
 }
 END_TEST
 
+START_TEST(find_semver)
+{
+	NEM_imgver_t vers[] = {
+		{ .id = 1, .version = strdup("1.0.0"), .sha256 = strdup(SHA256_"1") },
+		{ .id = 2, .version = strdup("1.0.1"), .sha256 = strdup(SHA256_"2") },
+		{ .id = 3, .version = strdup("1.0.2"), .sha256 = strdup(SHA256_"3") },
+		{ .id = 4, .version = strdup("1.1.0"), .sha256 = strdup(SHA256_"4") },
+		{ .id = 5, .version = strdup("1.2.1"), .sha256 = strdup(SHA256_"5") },
+		{ .id = 6, .version = strdup("2.0.0"), .sha256 = strdup(SHA256_"6") },
+		{ .id = 7, .version = strdup("2.0.1"), .sha256 = strdup(SHA256_"7") },
+	};
+	NEM_img_t img = { .id = 1, .name = strdup("img") }, *pimg = &img;
+
+	NEM_imgset_t set;
+	NEM_imgset_init(&set);
+	ck_err(NEM_imgset_add_img(&set, &pimg));
+	ck_assert_ptr_ne(&img, pimg);
+
+	for (size_t i = 0; i < NEM_ARRSIZE(vers); i += 1) {
+		NEM_imgver_t *ver = &vers[i];
+		ck_err(NEM_imgset_add_ver(&set, &ver, pimg));
+	}
+
+	static const struct {
+		const char *ver;
+		int         expect;
+	}
+	tests[] = {
+		{  "1.0.1", 2 },
+		{ "~1.0.0", 3 },
+		{ "^1.0.0", 5 },
+		{ "^2.0.0", 7 },
+	};
+
+	for (size_t i = 0; i < NEM_ARRSIZE(tests); i += 1) {
+		NEM_imgver_t *ver = NEM_img_imgver_by_semver(&set, pimg, tests[i].ver);
+		ck_assert_msg(ver != NULL, "no matching version for %s", tests[i].ver);
+		ck_assert_int_eq(tests[i].expect, ver->id);
+	}
+
+	NEM_imgset_free(&set);
+}
+END_TEST
+
 Suite*
 suite_imgset()
 {
@@ -330,6 +374,7 @@ suite_imgset()
 		{ "err_ver_bad_dupe_hash",    &err_ver_bad_dupe_hash    },
 		{ "err_ver_bad_dupe_ver",     &err_ver_bad_dupe_ver     },
 		{ "ver_link",                 &ver_link                 },
+		{ "find_semver",              &find_semver              },
 	};
 
 	return tcase_build_suite("imgset", tests, sizeof(tests));
