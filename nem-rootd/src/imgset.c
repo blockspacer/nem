@@ -243,7 +243,7 @@ NEM_imgset_add_img(
 NEM_err_t
 NEM_imgset_add_ver(
 	NEM_imgset_t *this,
-	NEM_imgver_t  **ver,
+	NEM_imgver_t **ver,
 	NEM_img_t    *image
 ) {
 	if ((*ver)->id == 0) {
@@ -311,8 +311,8 @@ NEM_imgset_add_ver(
 		));
 	}
 
-	memcpy(&this->vers[this->vers_len], *ver, sizeof(**ver));
-	bzero(*ver, sizeof(**ver));
+	memcpy(&this->vers[this->vers_len], *ver, sizeof(NEM_imgver_t));
+	bzero(*ver, sizeof(NEM_imgver_t));
 	*ver = &this->vers[this->vers_len];
 	this->vers_len += 1;
 

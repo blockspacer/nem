@@ -59,13 +59,18 @@ dupe_arg(int argc, char *argv[])
 static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])
 {
-	if (1 == getpid()) {
-		is_init = true;
-	}
-	if (0 == geteuid()) {
-		is_root = true;
-	}
-	rootd_path = strdup(argv[0]);
+	// XXX: This state is really a pain in the ass for re-entrant calls.
+	is_init = (1 == getpid());
+	is_root = (0 == geteuid());
+	rootd_path = NULL;
+	config_path = NULL;
+	verbose = 0;
+	reload = 0;
+
+	// NB: Explicitly reset getopt state when re-initializing. This is
+	// mostly for the test suite which is re-entrant without forking.
+	optind = 1;
+	optreset = 1;
 
 	char ch = 0;
 	int idx = 0;
@@ -101,6 +106,7 @@ setup(NEM_app_t *app, int argc, char *argv[])
 		config_path = strdup("./config.yaml");
 	}
 
+	rootd_path = strdup(argv[0]);
 	return NEM_err_none;
 }
 
