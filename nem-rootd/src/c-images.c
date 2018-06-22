@@ -13,8 +13,6 @@
 #include "c-database.h"
 
 static char *images_path = NULL;
-static char *persisted_path = NULL;
-static char *shared_mounts_path = NULL;
 static NEM_imgset_t static_imgset;
 
 static NEM_err_t
@@ -22,12 +20,10 @@ make_directories(const char *base)
 {
 	static const struct {
 		const char *path;
-		char **save;
+		char      **save;
 	}
 	paths[] = {
-		{ "images",        &images_path        },
-		{ "shared_mounts", &shared_mounts_path },
-		{ "persisted",     &persisted_path     },
+		{ "images", &images_path },
 	};
 
 	for (size_t i = 0; i < NEM_ARRSIZE(paths); i += 1) {
@@ -354,6 +350,35 @@ done:
 	return err;
 }
 
+NEM_err_t
+NEM_rootd_find_image(const NEM_jailimg_t *ji, char **out)
+{
+	NEM_img_t *img = NEM_imgset_img_by_name(&static_imgset, ji->name);
+	if (NULL == img) {
+		return NEM_err_static("NEM_rootd_find_image: image missing");
+	}
+
+	NEM_imgver_t *ver = NULL;
+
+	if (NULL != ji->sha256) {
+		ver = NEM_img_imgver_by_hash(&static_imgset, img, ji->sha256);
+		if (NULL == ver) {
+			return NEM_err_static("NEM_rootd_find_image: no matching hash");
+		}
+	}
+	else if (NULL != ji->semver) {
+		NEM_panic("TODO: image semver bits");
+	}
+	else {
+		ver = NEM_img_imgver_latest(&static_imgset, img);
+		if (NULL == ver) {
+			return NEM_err_static("NEM_rootd_find_image: no versions of image");
+		}
+	}
+
+	return NEM_path_join(out, images_path, ver->sha256);
+}
+
 static NEM_err_t
 setup(NEM_app_t *app, int argc, char *argv[])
 {
@@ -426,8 +451,6 @@ teardown(NEM_app_t *app)
 	NEM_imgset_free(&static_imgset);
 
 	free(images_path);
-	free(persisted_path);
-	free(shared_mounts_path);
 }
 
 const NEM_app_comp_t NEM_rootd_c_images = {

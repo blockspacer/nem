@@ -584,6 +584,8 @@ NEM_disk_init_device(NEM_disk_t **out, const char *device)
 NEM_err_t
 NEM_disk_init_mem(NEM_disk_t **out, size_t len)
 {
+	// XXX: This needs to be able to find an existing unused disk with
+	// the same file.
 	NEM_disk_md_t *md = NULL;
 	NEM_err_t err = NEM_disk_md_new_mem(&md, &static_disks, len);
 	if (NEM_err_ok(err)) {
@@ -596,6 +598,8 @@ NEM_disk_init_mem(NEM_disk_t **out, size_t len)
 NEM_err_t
 NEM_disk_init_file(NEM_disk_t **out, const char *path, bool ro)
 {
+	// XXX: This needs to be able to find an existing unused disk with the
+	// same file.
 	NEM_disk_md_t *md = NULL;
 	NEM_err_t err = NEM_disk_md_new_file(&md, &static_disks, path, ro);
 	if (NEM_err_ok(err)) {

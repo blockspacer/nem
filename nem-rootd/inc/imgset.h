@@ -67,6 +67,13 @@ NEM_imgver_t* NEM_imgset_imgver_by_id(
 	int           id
 );
 
+NEM_imgver_t* NEM_img_imgver_latest(NEM_imgset_t *set, NEM_img_t *this);
+NEM_imgver_t* NEM_img_imgver_by_hash(
+	NEM_imgset_t *set,
+	NEM_img_t    *this,
+	const char   *sha256hex
+);
+
 NEM_err_t NEM_imgset_add_img(
 	NEM_imgset_t *this,
 	NEM_img_t   **img

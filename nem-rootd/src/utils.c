@@ -131,3 +131,15 @@ done:
 	close(dir_fd);
 	return err;
 }
+
+int
+NEM_tm_cmp(struct tm *lhs, struct tm *rhs)
+{
+	time_t lhst = mktime(lhs);
+	time_t rhst = mktime(rhs);
+
+	if (lhst == rhst) {
+		return 0;
+	}
+	return (lhst < rhst) ? -1 : 1;
+}

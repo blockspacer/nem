@@ -13,6 +13,8 @@ NEM_jailimg_isolate_t;
 typedef enum {
 	NEM_IMG_INVALID    = 0,
 
+	// NEM_IMG_SINGLEFILE just copies a file from the host root's absolute
+	// path into the jail's definition.
 	NEM_IMG_SINGLEFILE = 1,
 
 	// NEM_IMG_IMAGE is a ro mount from a base file image. This is

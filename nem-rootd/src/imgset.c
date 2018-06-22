@@ -4,6 +4,7 @@
 
 #include "nem.h"
 #include "imgset.h"
+#include "utils.h"
 
 const char*
 NEM_imgver_status_string(int status)
@@ -110,6 +111,40 @@ NEM_imgset_imgver_by_id(NEM_imgset_t *this, int id)
 	for (size_t i = 0; i < this->vers_len; i += 1) {
 		if (this->vers[i].id == id) {
 			return &this->vers[i];
+		}
+	}
+
+	return NULL;
+}
+
+NEM_imgver_t*
+NEM_img_imgver_latest(NEM_imgset_t *set, NEM_img_t *this)
+{
+	if (0 == this->vers_len) {
+		return NULL;
+	}
+
+	NEM_imgver_t *latest = NEM_imgset_imgver_by_id(set, this->vers[0]);
+	for (size_t i = 1; i < this->vers_len; i += 1) {
+		NEM_imgver_t *test = NEM_imgset_imgver_by_id(set, this->vers[i]);
+		if (0 < NEM_tm_cmp(&latest->created, &test->created)) {
+			latest = test;
+		}
+	}
+
+	return latest;
+}
+
+NEM_imgver_t*
+NEM_img_imgver_by_hash(
+	NEM_imgset_t *set,
+	NEM_img_t    *this,
+	const char   *sha256hex
+) {
+	for (size_t i = 0; i < this->vers_len; i += 1) {
+		NEM_imgver_t *ver = NEM_imgset_imgver_by_id(set, this->vers[i]);
+		if (!strcmp(ver->sha256, sha256hex)) {
+			return ver;
 		}
 	}
 
