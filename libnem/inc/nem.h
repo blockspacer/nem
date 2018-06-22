@@ -28,6 +28,7 @@
 
 #include "nem-error.h"
 #include "nem-thunk.h"
+#include "nem-semver.h"
 #include "nem-panic.h"
 #include "nem-rootcert.h"
 #include "nem-marshal.h"
