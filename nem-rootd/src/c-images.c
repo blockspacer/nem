@@ -367,7 +367,10 @@ NEM_rootd_find_image(const NEM_jailimg_t *ji, char **out)
 		}
 	}
 	else if (NULL != ji->semver) {
-		NEM_panic("TODO: image semver bits");
+		ver = NEM_img_imgver_by_semver(&static_imgset, img, ji->semver);
+		if (NULL == ver) {
+			return NEM_err_static("NEM_rootd_find_image: no matching version");
+		}
 	}
 	else {
 		ver = NEM_img_imgver_latest(&static_imgset, img);

@@ -6,6 +6,7 @@
 #include "c-mounts.h"
 #include "c-log.h"
 #include "c-disk.h"
+#include "c-images.h"
 #include "c-config.h"
 #include "utils.h"
 
@@ -65,6 +66,7 @@ struct NEM_mount_t {
 	char            *dest;
 	int              refcount;
 	bool             owned;
+	bool             ephemeral;
 	bool             seen;
 };
 
@@ -157,6 +159,10 @@ NEM_mount_free(NEM_mount_t *this)
 	if (NULL != this->disk) {
 		NEM_disk_free(this->disk);
 		this->disk = NULL;
+	}
+
+	if (this->ephemeral) {
+		unlink(this->source);
 	}
 
 	free(this->source);
@@ -334,6 +340,17 @@ typedef struct {
 NEM_mount_images_baton_t;
 
 static void
+NEM_mountset_append(NEM_mountset_t *this, NEM_mount_t *mount)
+{
+	this->mounts = NEM_panic_if_null(realloc(
+		this->mounts,
+		sizeof(NEM_mount_t*) * (this->mounts_len + 1)
+	));
+	this->mounts[this->mounts_len] = mount;
+	this->mounts_len += 1;
+}
+
+static void
 NEM_mount_images_done(NEM_mount_images_baton_t *baton, NEM_err_t err)
 {
 	if (!NEM_err_ok(err)) {
@@ -448,7 +465,33 @@ NEM_mount_images_image(
 	NEM_mount_images_baton_t *baton,
 	const NEM_jailimg_t      *img
 ) {
-	NEM_panic("need to be able to resolve a NEM_disk_t");
+	char *path = NULL;
+	NEM_err_t err = NEM_rootd_find_image(img, &path);
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
+
+	NEM_disk_t *disk = NULL;
+	err = NEM_disk_init_file(&disk, path, true);
+	if (!NEM_err_ok(err)) {
+		return err;
+	}
+
+	char *dest = NULL;
+	NEM_path_join(&dest, baton->base, img->dest);
+
+	NEM_mount_t *mount = NULL;
+	err = NEM_mount_new_ufs(&mount, disk, dest, MNT_RDONLY);
+	if (!NEM_err_ok(err)) {
+		NEM_disk_free(disk);
+		free(dest);
+		return err;
+	}
+
+	LIST_INSERT_HEAD(&static_mounts, mount, link);
+	NEM_mountset_append(baton->set, mount);
+
+	return NEM_err_none;
 }
 
 static void
@@ -481,13 +524,19 @@ NEM_mount_images_step(NEM_mount_images_baton_t *baton)
 			baton->imgs_len -= 1;
 			return NEM_mount_images_step(baton);
 
-		default:
 		case NEM_IMG_VNODE:
+			// NB: This is an async thing which is annoying; it potentially
+			// needs to initialize a new vnode image.
 			NEM_panic("TODO");
 			break;
+
 		case NEM_IMG_SHARED:
 			NEM_panic("TODO");
 			break;
+
+		default:
+			err = NEM_err_static("NEM_mount_images: invalid image type");
+			return NEM_mount_images_done(baton, err);
 	}
 }
 
